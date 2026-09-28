@@ -1,26 +1,44 @@
 # AI Helpdesk
 
-API de triagem de chamados com classificação local, explicável e opção de integração futura com LLM.
+Aplicacao de portfolio para triagem explicavel de chamados de TI.
 
-## O que faz
-- Classifica categoria por sinais do texto
-- Sugere prioridade a partir de impacto/urgência
-- Identifica palavras-chave
-- Gera próximos passos seguros
-- Não executa comandos na máquina do usuário
-- Endpoint FastAPI pronto para integração com front-end/help desk
+## Recursos
+
+- Interface web responsiva
+- Classificacao por categoria
+- Priorizacao por impacto e indisponibilidade
+- Sinal de confianca explicavel
+- Palavras-chave do chamado
+- Playbooks por categoria
+- Processamento em lote pela API
+- Revisao humana obrigatoria
+- Nenhum comando e executado no endpoint
+
+## Categorias
+
+Rede, hardware, software, acesso, impressao, seguranca e outros.
 
 ## Executar
+
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app:app --reload
 ```
-Documentação: `/docs`.
 
-## Categorias
-Rede, hardware, software, acesso, impressão e outros.
+Abra http://127.0.0.1:8000. A documentacao interativa fica em /docs.
 
-## IA
-A versão inicial usa regras transparentes para funcionar sem enviar dados a terceiros. Uma camada LLM pode ser adicionada depois com anonimização, controle de PII, aprovação humana e fallback determinístico.
+## Testes
+
+```bash
+python -m pytest -q
+```
+
+## Evolucao com LLM
+
+A camada atual e deterministica para manter explicabilidade e privacidade. Uma integracao futura com LLM deve anonimizar PII, exigir aprovacao humana, registrar auditoria e manter fallback local.
+
+## Seguranca
+
+Use somente dados ficticios ou devidamente autorizados em demonstracoes publicas.
