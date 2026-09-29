@@ -6,17 +6,10 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from ml import load_or_train, train
 
-app=FastAPI(title="AI Helpdesk",version="2.0.0")
-
-RULES={
-"network":["internet","rede","wifi","wi-fi","dns","ip","cabo","conexao","vpn"],
-"hardware":["ssd","memoria","monitor","teclado","mouse","computador","notebook","hd","bateria"],
-"software":["erro","aplicativo","programa","windows","travando","sistema","dll","atualizacao"],
-"access":["senha","login","acesso","bloqueado","permissao","mfa","conta"],
-"printing":["impressora","imprimir","scanner","toner","fila"],
-"security":["phishing","malware","virus","suspeito","fraude","credencial"]
-}
+app=FastAPI(title="AI Helpdesk",version="3.0.0")
+MODEL=load_or_train()
 
 PLAYBOOKS={
 "network":["Confirmar escopo e usuarios afetados","Validar link, IP e gateway","Testar DNS e destino","Registrar evidencias antes de alterar configuracoes"],
@@ -42,31 +35,35 @@ def normalize(text:str)->str:
     value=unicodedata.normalize("NFKD",text.lower())
     return "".join(ch for ch in value if not unicodedata.combining(ch))
 
-def classify(text:str):
-    t=normalize(text)
-    scores={k:sum(1 for w in words if w in t) for k,words in RULES.items()}
-    category=max(scores,key=scores.get)
-    confidence=min(0.99,0.45+0.12*scores[category]) if scores[category] else 0.25
-    return (category if scores[category] else "other"),scores,round(confidence,2)
-
 def priority(t:Ticket)->str:
     if t.service_stopped and (t.affected_users>=10 or t.vip_or_critical_area): return "critical"
     if t.service_stopped or t.affected_users>=10 or t.vip_or_critical_area: return "high"
     if t.affected_users>=3: return "medium"
     return "low"
 
+def predict_category(text:str):
+    normalized=normalize(text)
+    probabilities=MODEL.predict_proba([normalized])[0]
+    classes=MODEL.classes_
+    pairs=sorted(zip(classes,probabilities),key=lambda x:x[1],reverse=True)
+    category,confidence=pairs[0]
+    alternatives=[{"category":c,"confidence":round(float(p),3)} for c,p in pairs[:3]]
+    return str(category),round(float(confidence),3),alternatives
+
 def triage_one(ticket:Ticket):
     text=f"{ticket.title} {ticket.description}"
-    category,scores,confidence=classify(text)
+    category,confidence,alternatives=predict_category(text)
     keywords=sorted(set(re.findall(r"[A-Za-z0-9_-]{4,}",normalize(text))))[:20]
+    p=priority(ticket)
     return {
       "category":category,
-      "priority":priority(ticket),
+      "priority":p,
       "confidence":confidence,
-      "confidence_signal":scores,
+      "alternatives":alternatives,
       "keywords":keywords,
       "suggested_next_steps":PLAYBOOKS[category],
-      "human_review_required":True,
+      "human_review_required":confidence<0.72 or p=="critical" or category=="security",
+      "model":"tfidf-logistic-regression-v1",
       "generated_at":datetime.now(timezone.utc).isoformat()
     }
 
@@ -75,7 +72,12 @@ def home():
     with open("frontend.html","r",encoding="utf-8") as f: return f.read()
 
 @app.get("/health")
-def health(): return {"status":"ok","version":"2.0.0"}
+def health(): return {"status":"ok","version":"3.0.0","model":"tfidf-logistic-regression-v1"}
+
+@app.get("/model/metrics")
+def model_metrics():
+    _,metrics=train(save=False)
+    return metrics
 
 @app.post("/triage")
 def triage(ticket:Ticket): return triage_one(ticket)

@@ -1,33 +1,54 @@
-# AI Helpdesk
+# AI Helpdesk ML
 
-Aplicacao de portfolio para triagem explicavel de chamados de TI.
+Projeto de portfólio para triagem de chamados de TI com **Machine Learning local e explicável**.
 
-## Recursos
+## O que mudou na V3
 
-- Interface web responsiva
-- Classificacao por categoria
-- Priorizacao por impacto e indisponibilidade
-- Sinal de confianca explicavel
-- Palavras-chave do chamado
-- Playbooks por categoria
-- Processamento em lote pela API
-- Revisao humana obrigatoria
-- Nenhum comando e executado no endpoint
+A classificação deixou de depender somente de regras. O projeto agora treina um pipeline real de NLP:
 
-## Categorias
+- `TfidfVectorizer` com unigramas e bigramas
+- `LogisticRegression` com balanceamento de classes
+- divisão treino/teste estratificada
+- accuracy, macro F1 e weighted F1
+- matriz de confusão exportada
+- probabilidades usadas como sinal de confiança
+- revisão humana para baixa confiança, incidentes críticos e segurança
 
-Rede, hardware, software, acesso, impressao, seguranca e outros.
+A prioridade continua baseada em regras de impacto/urgência porque categoria e severidade são problemas diferentes.
 
-## Executar
+## Dataset
+
+`data/tickets.csv` contém exemplos **sintéticos** criados exclusivamente para demonstração. As métricas desse conjunto não devem ser interpretadas como desempenho em produção.
+
+## Treinamento
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
+python train.py
+```
+
+Isso gera localmente:
+
+- `artifacts/ticket_classifier.joblib`
+- `artifacts/metrics.json`
+- `artifacts/confusion_matrix.csv`
+
+## Aplicação
+
+```bash
 uvicorn app:app --reload
 ```
 
-Abra http://127.0.0.1:8000. A documentacao interativa fica em /docs.
+Abra `http://127.0.0.1:8000`.
+
+## API
+
+- `POST /triage`
+- `POST /triage/batch`
+- `GET /model/metrics`
+- `GET /health`
 
 ## Testes
 
@@ -35,10 +56,6 @@ Abra http://127.0.0.1:8000. A documentacao interativa fica em /docs.
 python -m pytest -q
 ```
 
-## Evolucao com LLM
+## Limitações
 
-A camada atual e deterministica para manter explicabilidade e privacidade. Uma integracao futura com LLM deve anonimizar PII, exigir aprovacao humana, registrar auditoria e manter fallback local.
-
-## Seguranca
-
-Use somente dados ficticios ou devidamente autorizados em demonstracoes publicas.
+O dataset é pequeno e sintético. O objetivo é demonstrar pipeline, avaliação, serving e decisões de produto; não afirmar precisão de produção. Um deployment real exigiria dados anonimizados, análise de drift, avaliação por fila/idioma, observabilidade e governança.

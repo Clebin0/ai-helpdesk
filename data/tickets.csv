@@ -1,0 +1,71 @@
+text,category
+"sem internet no computador e dns nao resolve",network
+"wifi conectado mas sem acesso a internet",network
+"usuario nao consegue acessar a vpn",network
+"cabo de rede conectado mas sem ip",network
+"gateway nao responde na estacao",network
+"rede oscilando e com perda de pacotes",network
+"site interno nao abre por falha de dns",network
+"notebook sem conexao na rede corporativa",network
+"latencia muito alta para o servidor",network
+"interface de rede aparece desconectada",network
+"ssd em 100 por cento e computador lento",hardware
+"monitor nao apresenta imagem",hardware
+"teclado parou de funcionar",hardware
+"mouse desconectando sozinho",hardware
+"notebook nao liga mesmo com carregador",hardware
+"memoria ram apresenta falha",hardware
+"disco fazendo ruido e sistema travando",hardware
+"bateria do notebook nao carrega",hardware
+"computador reinicia ao ligar",hardware
+"segundo monitor nao e detectado",hardware
+"aplicativo fecha com erro ao iniciar",software
+"windows travando depois da atualizacao",software
+"sistema apresenta erro de dll",software
+"programa corporativo nao abre",software
+"aplicacao fica congelada durante uso",software
+"erro ao instalar atualizacao do software",software
+"servico do windows nao inicia",software
+"aplicativo perdeu configuracao depois de update",software
+"sistema exibe mensagem de runtime error",software
+"programa muito lento mesmo com maquina normal",software
+"usuario esqueceu a senha da conta",access
+"conta bloqueada depois de varias tentativas",access
+"sem permissao para acessar a pasta",access
+"login recusado no sistema interno",access
+"mfa nao envia codigo de autenticacao",access
+"usuario precisa de acesso ao sistema",access
+"permissao foi removida da conta",access
+"senha expirou e usuario nao consegue entrar",access
+"acesso negado mesmo com credencial correta",access
+"conta nova ainda nao possui permissoes",access
+"impressora nao imprime documento",printing
+"fila de impressao travada",printing
+"scanner da multifuncional nao funciona",printing
+"impressora aparece offline",printing
+"toner trocado mas impressao continua falhando",printing
+"documento fica preso na fila",printing
+"driver da impressora apresenta erro",printing
+"nao consigo digitalizar pelo scanner",printing
+"impressora de rede nao e encontrada",printing
+"pagina sai em branco na impressora",printing
+"recebi email suspeito pedindo minha senha",security
+"usuario clicou em link de phishing",security
+"arquivo suspeito foi aberto no computador",security
+"antivirus detectou malware",security
+"possivel vazamento de credencial",security
+"computador apresenta alerta de virus",security
+"mensagem solicita pagamento e parece fraude",security
+"usuario informou senha em site suspeito",security
+"arquivo desconhecido chegou por email",security
+"possivel comprometimento de conta",security
+"preciso configurar um novo equipamento",other
+"duvida sobre procedimento interno de ti",other
+"solicitacao de orientacao para equipamento novo",other
+"pedido de informacao sem erro tecnico",other
+"necessario avaliar uma melhoria de processo",other
+"usuario quer saber como usar recurso do sistema",other
+"solicitacao geral para equipe de tecnologia",other
+"pedido de apoio em atividade de rotina",other
+"duvida sem impacto no servico",other
+"necessario encaminhar demanda para outra equipe",other
