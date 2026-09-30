@@ -1,16 +1,41 @@
 # Architecture
 
+## Goal
+
+AI Helpdesk is a local ML triage pipeline for classifying IT tickets while keeping priority rules and human review explicit.
+
+## Request flow
+
 ```mermaid
 flowchart LR
-    A[Synthetic ticket dataset] --> B[Train / test split]
-    B --> C[TF-IDF]
-    C --> D[Logistic Regression]
-    D --> E[Metrics + confusion matrix]
-    D --> F[Serialized model]
-    F --> G[FastAPI inference]
-    G --> H[Category + confidence]
-    H --> I[Priority rules]
-    I --> J[Human review]
+    A[Ticket] --> B[FastAPI]
+    B --> C[Text normalization]
+    C --> D[TF-IDF pipeline]
+    D --> E[Selected classifier]
+    E --> F[Category + confidence]
+    A --> G[Operational impact rules]
+    G --> H[Priority]
+    F --> I[Human review policy]
+    H --> I
+    I --> J[Triage response]
 ```
 
-The classifier predicts the ticket category. Priority is intentionally handled by a separate deterministic policy using impact and outage information; classification confidence is not treated as incident severity.
+## Training flow
+
+```mermaid
+flowchart LR
+    A[Synthetic ticket dataset] --> B[Train / holdout split]
+    B --> C[Cross-validation]
+    C --> D[Logistic Regression]
+    C --> E[Complement Naive Bayes]
+    C --> F[SGD log-loss]
+    D --> G[Macro F1 comparison]
+    E --> G
+    F --> G
+    G --> H[Selected model]
+    H --> I[Serialized artifact + metrics]
+```
+
+## Design choices
+
+Classification confidence never replaces operational impact. Critical tickets, security tickets and low-confidence predictions require human review. The repository contains synthetic data only.
