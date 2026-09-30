@@ -1,41 +1,33 @@
-# Architecture
+# Arquitetura
 
-## Goal
-
-AI Helpdesk is a local ML triage pipeline for classifying IT tickets while keeping priority rules and human review explicit.
-
-## Request flow
+A classificação do chamado e a prioridade ficam separadas. O modelo tenta identificar a categoria; impacto e urgência continuam sendo tratados por regras simples.
 
 ```mermaid
 flowchart LR
-    A[Ticket] --> B[FastAPI]
-    B --> C[Text normalization]
-    C --> D[TF-IDF pipeline]
-    D --> E[Selected classifier]
-    E --> F[Category + confidence]
-    A --> G[Operational impact rules]
-    G --> H[Priority]
-    F --> I[Human review policy]
+    A[Chamado] --> B[FastAPI]
+    B --> C[Normalização do texto]
+    C --> D[TF-IDF]
+    D --> E[Classificador]
+    E --> F[Categoria e confiança]
+    A --> G[Regras de impacto]
+    G --> H[Prioridade]
+    F --> I[Resultado]
     H --> I
-    I --> J[Triage response]
 ```
 
-## Training flow
+## Treinamento
 
 ```mermaid
 flowchart LR
-    A[Synthetic ticket dataset] --> B[Train / holdout split]
-    B --> C[Cross-validation]
+    A[Dataset de chamados] --> B[Train / holdout]
+    B --> C[Validação cruzada]
     C --> D[Logistic Regression]
     C --> E[Complement Naive Bayes]
-    C --> F[SGD log-loss]
-    D --> G[Macro F1 comparison]
+    C --> F[SGD]
+    D --> G[Comparação por Macro F1]
     E --> G
     F --> G
-    G --> H[Selected model]
-    H --> I[Serialized artifact + metrics]
+    G --> H[Modelo escolhido]
 ```
 
-## Design choices
-
-Classification confidence never replaces operational impact. Critical tickets, security tickets and low-confidence predictions require human review. The repository contains synthetic data only.
+Chamados críticos, de segurança ou com confiança baixa continuam marcados para revisão manual. O dataset do repositório é de demonstração e não contém chamados reais.
