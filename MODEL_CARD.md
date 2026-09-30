@@ -1,37 +1,39 @@
-# Model Card — AI Helpdesk ML
+# Modelo
 
-## Model
+## O que ele faz
 
-- Task: multiclass text classification for IT helpdesk categories
-- Pipeline: TF-IDF (1-2 grams) + Logistic Regression
-- Language: Portuguese
-- Classes: network, hardware, software, access, printing, security, other
-- Serving: FastAPI
+O classificador recebe o texto de um chamado e tenta encaixar em uma das categorias:
 
-## Data
+- network
+- hardware
+- software
+- access
+- printing
+- security
+- other
 
-The repository uses a small **synthetic dataset** created only for portfolio demonstration. It does not contain company tickets, user data, credentials or production logs.
+O pipeline usa TF-IDF com n-grams de 1 e 2 termos. O classificador escolhido no treino é salvo e carregado pela API em FastAPI.
 
-## Intended use
+## Dados
 
-Demonstrate an end-to-end ML workflow: dataset preparation, training, evaluation, model persistence, inference API, confidence output, tests and CI.
+O dataset deste repositório foi montado só para teste do fluxo. Não tem chamado real, dado de usuário, credencial ou log de empresa.
 
-## Not intended for
+## Como estou avaliando
 
-- autonomous incident resolution
-- access decisions
-- production security classification
-- employee evaluation
-- replacement of a support analyst
+No treino eu comparo os modelos por Macro F1 usando validação cruzada. Depois avalio o escolhido em um holdout separado.
 
-## Evaluation
+Também salvo:
 
-Training exports accuracy, macro F1, weighted F1 and a confusion matrix. These values measure performance only on the synthetic holdout set and must not be interpreted as expected production accuracy.
+- accuracy
+- macro F1
+- weighted F1
+- F1 por categoria
+- matriz de confusão
 
-## Human oversight
+Esses números servem para comparar versões dentro deste laboratório. Não são uma estimativa de desempenho em produção.
 
-Human review is required for low-confidence predictions, security-related tickets and critical incidents.
+## Limites atuais
 
-## Production gaps
+Hoje o projeto ainda não trata bem coisas como mudança de vocabulário, categorias desbalanceadas, calibração de confiança ou histórico real de chamados.
 
-A real deployment would require anonymized historical data, data-quality checks, drift monitoring, per-class error analysis, calibration, retraining policy, audit logs and access controls.
+Chamados de segurança, incidentes críticos e previsões com confiança baixa continuam marcados para revisão manual.
