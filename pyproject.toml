@@ -1,0 +1,8 @@
+[project]
+name = "ai-helpdesk"
+version = "4.0.0"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
