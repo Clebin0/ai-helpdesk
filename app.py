@@ -14,52 +14,52 @@ from ml import load_model, read_comparison, read_confusion, read_metrics
 LOW_CONFIDENCE_THRESHOLD = 0.72
 LOW_MARGIN_THRESHOLD = 0.12
 
-app = FastAPI(title="AI Helpdesk ML", version="4.1.0")
+app = FastAPI(title="Helpdesk Triage Lab", version="4.1.0")
 MODEL = load_model()
 MODEL_METRICS = read_metrics()
 
 PLAYBOOKS = {
     "network": [
-        "Confirmar escopo e usuarios afetados",
-        "Validar link, IP e gateway",
-        "Testar DNS e destino",
-        "Registrar evidencias antes de alterar configuracoes",
+        "Confirmar quantas pessoas e quais unidades foram afetadas",
+        "Verificar link, endereço IP e gateway",
+        "Testar a resolução DNS e o acesso ao destino",
+        "Registrar horários e evidências antes de alterar configurações",
     ],
     "hardware": [
-        "Registrar modelo e sintomas",
-        "Verificar recursos e eventos do sistema",
-        "Executar testes nao destrutivos",
-        "Planejar troca somente apos diagnostico",
+        "Registrar modelo, número de série e sintomas",
+        "Verificar alimentação, conexões e indicadores físicos",
+        "Executar testes que não alterem os dados do equipamento",
+        "Recomendar troca somente depois de isolar a falha",
     ],
     "software": [
-        "Registrar mensagem de erro",
-        "Reproduzir o problema",
-        "Validar versao, logs e dependencias",
-        "Testar correcao em escopo controlado",
+        "Registrar a mensagem de erro e a versão do aplicativo",
+        "Tentar reproduzir o problema em condições controladas",
+        "Conferir logs, dependências e alterações recentes",
+        "Validar a correção antes de liberar para o usuário",
     ],
     "access": [
-        "Confirmar identidade pelo processo oficial",
-        "Validar conta, bloqueio e permissao",
-        "Evitar compartilhar credenciais",
-        "Escalar privilegios ao responsavel",
+        "Confirmar a identidade pelo procedimento oficial",
+        "Verificar situação da conta e permissão solicitada",
+        "Não pedir nem compartilhar senha ou código MFA",
+        "Encaminhar a aprovação ao responsável pelo sistema",
     ],
     "printing": [
-        "Validar energia e conectividade",
-        "Verificar fila e impressora padrao",
-        "Testar pagina de diagnostico",
-        "Registrar erro do driver ou spooler",
+        "Verificar energia, conexão e painel da impressora",
+        "Conferir fila, equipamento padrão e servidor de impressão",
+        "Imprimir uma página de teste",
+        "Registrar o erro do driver ou do spooler",
     ],
     "security": [
-        "Isolar o risco sem apagar evidencias",
-        "Orientar o usuario a nao interagir mais",
-        "Registrar origem, horario e indicadores",
-        "Escalar ao processo de seguranca",
+        "Isolar o equipamento conforme o procedimento da equipe, sem apagar evidências",
+        "Orientar o usuário a interromper a interação com a mensagem ou arquivo",
+        "Registrar remetente, horário, URL e outros indicadores disponíveis",
+        "Acionar o fluxo de resposta a incidentes de segurança",
     ],
     "other": [
-        "Coletar evidencias",
-        "Definir impacto e escopo",
-        "Reproduzir quando seguro",
-        "Encaminhar para a fila adequada",
+        "Esclarecer o resultado esperado e o que já foi tentado",
+        "Identificar pessoas, sistemas e unidades afetadas",
+        "Reproduzir o cenário somente quando for seguro",
+        "Encaminhar a solicitação para a fila responsável",
     ],
 }
 

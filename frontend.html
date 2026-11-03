@@ -1,14 +1,369 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Helpdesk Classifier</title>
-<style>:root{--bg:#090909;--panel:#111;--line:#252525;--text:#f3f3f3;--muted:#858585;--ok:#9fd0a3}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,rgba(255,255,255,.04),transparent 28%),var(--bg);color:var(--text);font:14px Inter,Segoe UI,sans-serif}.wrap{max-width:1180px;margin:auto;padding:32px}.top{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:20px}.brand{font-size:28px;font-weight:760;letter-spacing:-.04em}.muted{color:var(--muted)}.status{font:11px ui-monospace,monospace;color:#9e9e9e}.status:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:7px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.card,.panel{background:rgba(17,17,17,.9);border:1px solid var(--line);border-radius:14px;padding:18px}.panel{margin-top:14px}.metric{font-size:30px;font-weight:760;margin-top:7px;letter-spacing:-.04em}.label{color:#696969;font:10px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.08em}input,textarea,button{width:100%;background:#0d0d0d;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px;margin:6px 0}textarea{min-height:170px;resize:vertical}button{background:#fff;color:#080808;border-color:#fff;font-weight:750;cursor:pointer}.inline{display:flex;gap:12px;align-items:center}.inline label{flex:1}.inline input[type=checkbox]{width:auto}.pill{display:inline-block;padding:5px 8px;border:1px solid #2b2b2b;border-radius:999px;margin:2px;color:#aaa;font:10px ui-monospace,monospace}.bar-row{display:grid;grid-template-columns:150px 1fr 55px;gap:10px;align-items:center;margin:10px 0}.bar{height:7px;background:#1c1c1c;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:#eaeaea;border-radius:99px}.matrix{overflow:auto}.matrix table{border-collapse:collapse;width:100%;min-width:620px}.matrix th,.matrix td{border:1px solid #242424;padding:9px;text-align:center;font:10px ui-monospace,monospace}.matrix th{color:#777}.matrix td{color:#ddd}.matrix .diag{background:#202020;font-weight:700}.steps li{margin:8px 0;color:#aaa}.note{font-size:11px;color:#666;line-height:1.6;margin-top:12px}@media(max-width:850px){.grid4{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}.bar-row{grid-template-columns:110px 1fr 45px}.wrap{padding:18px}}</style></head>
-<body><div class="wrap">
-<div class="top"><div><div class="label">CLASSIFICAÇÃO DE CHAMADOS</div><div class="brand">Helpdesk Classifier</div><p class="muted">Triagem de chamados com comparação de modelos, métricas e revisão humana.</p></div><div class="status">modelo pronto</div></div>
-<div class="grid4"><div class="card"><div class="label">Modelo selecionado</div><div id="modelName" class="metric" style="font-size:17px">-</div></div><div class="card"><div class="label">Accuracy</div><div id="accuracy" class="metric">-</div></div><div class="card"><div class="label">Macro F1</div><div id="macroF1" class="metric">-</div></div><div class="card"><div class="label">Amostras sintéticas</div><div id="samples" class="metric">-</div></div></div>
-<div class="grid2"><div class="panel"><h3>Novo chamado</h3><input id="title" placeholder="Ex.: Sem acesso a internet"><textarea id="description" placeholder="Descreva o problema, impacto e sintomas"></textarea><input id="users" type="number" min="1" value="1" placeholder="Usuários afetados"><div class="inline"><label><input id="stopped" type="checkbox"> Serviço parado</label><label><input id="criticalArea" type="checkbox"> Área crítica / VIP</label></div><button onclick="run()">Executar triagem</button><div class="note">O modelo classifica categoria. Prioridade continua separada, baseada em impacto e indisponibilidade.</div></div>
-<div class="panel"><h3>Predição</h3><div id="empty" class="muted">Preencha o chamado para executar o modelo.</div><div id="result" style="display:none"><p><span id="category" class="pill"></span><span id="priority" class="pill"></span><span id="confidence" class="pill"></span></p><div id="alternatives" class="muted"></div><h4>Próximos passos</h4><ol id="steps" class="steps"></ol><p id="review" class="note"></p></div></div></div>
-<div class="grid2"><div class="panel"><h3>Comparação de modelos</h3><div id="comparison"></div><div class="note">Seleção feita por Macro F1 médio em validação cruzada apenas no conjunto de treino.</div></div><div class="panel"><h3>F1 por categoria</h3><div id="perClass"></div><div class="note">Resultados do holdout sintético. Não representam tráfego real de produção.</div></div></div>
-<div class="panel matrix"><h3>Matriz de confusão</h3><div id="matrix"></div></div></div>
-<script>const pct=v=>Math.round(Number(v)*100)+"%";function metricBars(target,rows,key,labelKey){target.innerHTML=rows.map(r=>'<div class="bar-row"><span class="muted">'+r[labelKey]+'</span><div class="bar"><i style="width:'+Math.max(2,Number(r[key])*100)+'%"></i></div><span>'+pct(r[key])+'</span></div>').join("")}
-async function loadModel(){const [m,c,cm]=await Promise.all([fetch("/model/metrics").then(r=>r.json()),fetch("/model/comparison").then(r=>r.json()),fetch("/model/confusion").then(r=>r.json())]);modelName.textContent=m.selected_model.replaceAll("_"," ");accuracy.textContent=pct(m.accuracy);macroF1.textContent=pct(m.macro_f1);samples.textContent=m.samples;metricBars(comparison,c,"cv_macro_f1_mean","model");const cls=Object.entries(m.per_class_f1).map(([category,value])=>({category,value}));metricBars(perClass,cls,"value","category");let h="<table><tr><th>real / prev.</th>"+cm.labels.map(x=>"<th>"+x+"</th>").join("")+"</tr>";cm.matrix.forEach((row,i)=>{h+="<tr><th>"+cm.labels[i]+"</th>"+row.map((v,j)=>'<td class="'+(i===j?"diag":"")+'">'+v+"</td>").join("")+"</tr>"});matrix.innerHTML=h+"</table>"}
-async function run(){let body={title:title.value,description:description.value,affected_users:Number(users.value||1),service_stopped:stopped.checked,vip_or_critical_area:criticalArea.checked};let r=await fetch("/triage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!r.ok){alert("Verifique os campos.");return}let d=await r.json();empty.style.display="none";result.style.display="block";category.textContent="Categoria: "+d.category;priority.textContent="Prioridade: "+d.priority;confidence.textContent="Confiança: "+pct(d.confidence);alternatives.textContent="Top 3: "+d.alternatives.map(x=>x.category+" "+pct(x.confidence)).join(" · ")+" · Margem top 1–2: "+pct(d.confidence_margin||0);steps.innerHTML=d.suggested_next_steps.map(x=>"<li>"+x+"</li>").join("");const reviewLabels={security_category:"categoria de segurança",critical_impact:"impacto crítico",low_model_confidence:"baixa confiança do modelo",ambiguous_top_predictions:"predições ambíguas"};const reasons=(d.human_review_reasons||[]).map(x=>reviewLabels[x]||x);review.textContent=d.human_review_required?"Revisão humana obrigatória: "+reasons.join(", "):"Sem gatilho automático de revisão. A decisão final continua sendo do analista."}
-loadModel();</script></body></html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eef2f5">
+  <title>Helpdesk Triage</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef2f5;
+      --surface: #ffffff;
+      --surface-soft: #f7f9fa;
+      --line: #d7e0e5;
+      --text: #1c303b;
+      --muted: #687c86;
+      --accent: #126b78;
+      --accent-soft: #e2f1f2;
+      --warning: #9b5b19;
+      --warning-soft: #fff3e5;
+      --success: #26724d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 Inter, "Segoe UI", Arial, sans-serif;
+    }
+    button, input, textarea { font: inherit; }
+    .wrap { width: min(1180px, 100%); margin: 0 auto; padding: 30px 28px 42px; }
+    .top {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 20px; padding-bottom: 22px; border-bottom: 1px solid var(--line);
+    }
+    .brand-row { display: flex; align-items: center; gap: 14px; }
+    .brand-mark {
+      display: grid; place-items: center; width: 42px; height: 42px;
+      border-radius: 8px; background: var(--accent); color: white;
+      font-size: 13px; font-weight: 800; letter-spacing: .04em;
+    }
+    .kicker {
+      color: var(--accent); font-size: 10px; font-weight: 800;
+      letter-spacing: .13em; text-transform: uppercase;
+    }
+    h1 { margin: 2px 0 0; font-size: 25px; letter-spacing: -.035em; }
+    h2, h3 { margin: 0; }
+    .subtitle { margin: 5px 0 0; color: var(--muted); }
+    .model-status {
+      padding: 7px 10px; border: 1px solid #c4ddcf; border-radius: 5px;
+      background: #edf7f0; color: var(--success); font-size: 11px; font-weight: 700;
+      white-space: nowrap;
+    }
+    .model-status::before {
+      content: ""; display: inline-block; width: 7px; height: 7px;
+      margin-right: 7px; border-radius: 50%; background: var(--success);
+    }
+    .metrics {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px; margin: 18px 0;
+    }
+    .metric, .panel {
+      min-width: 0; border: 1px solid var(--line); border-radius: 7px;
+      background: var(--surface);
+    }
+    .metric { padding: 14px 16px; }
+    .metric-label { color: var(--muted); font-size: 11px; }
+    .metric-value { margin-top: 5px; font-size: 25px; font-weight: 750; letter-spacing: -.04em; }
+    .metric-value.model { font-size: 15px; letter-spacing: 0; }
+    .layout-two {
+      display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 12px;
+    }
+    .panel { padding: 18px; margin-top: 12px; }
+    .panel h2 { margin-bottom: 14px; font-size: 15px; }
+    .field { display: grid; gap: 5px; margin-bottom: 11px; }
+    .field span, .field-label { color: var(--muted); font-size: 11px; font-weight: 650; }
+    input, textarea {
+      width: 100%; min-width: 0; padding: 10px 11px;
+      border: 1px solid #cbd7dd; border-radius: 5px; background: #fff; color: var(--text);
+    }
+    input:focus, textarea:focus {
+      outline: 2px solid #a9d3d7; border-color: var(--accent);
+    }
+    textarea { min-height: 125px; resize: vertical; }
+    .checks { display: flex; flex-wrap: wrap; gap: 18px; margin: 5px 0 13px; }
+    .checks label { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+    .checks input { width: auto; accent-color: var(--accent); }
+    button {
+      border: 1px solid var(--accent); border-radius: 5px; padding: 10px 14px;
+      background: var(--accent); color: white; font-weight: 700; cursor: pointer;
+    }
+    button:hover { background: #0d5661; }
+    button:focus-visible { outline: 3px solid #a9d3d7; outline-offset: 2px; }
+    .submit { width: 100%; }
+    .hint, .note { color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .hint { margin: 12px 0 0; }
+    .empty { padding: 12px 0; color: var(--muted); }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+    .tag {
+      display: inline-flex; padding: 5px 8px; border-radius: 4px;
+      background: var(--accent-soft); color: #145663; font-size: 11px; font-weight: 700;
+    }
+    .tag.priority { background: var(--warning-soft); color: var(--warning); }
+    .result-copy { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+    .panel h3 { margin: 15px 0 7px; font-size: 12px; }
+    .steps { margin: 0; padding-left: 19px; }
+    .steps li { padding: 3px 0; color: #425963; font-size: 12px; }
+    .review {
+      margin: 13px 0 0; padding: 10px 11px; border-left: 3px solid #b7c5ca;
+      background: var(--surface-soft); color: #536872; font-size: 11px;
+    }
+    .review.required { border-color: #c0782d; background: var(--warning-soft); color: #754619; }
+    .bars { display: grid; gap: 11px; }
+    .bar-row { display: grid; grid-template-columns: 155px minmax(50px, 1fr) 42px; gap: 10px; align-items: center; }
+    .bar-label { overflow: hidden; color: #526772; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .bar { height: 8px; border-radius: 2px; background: #e9eef0; overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--accent); }
+    .bar-value { color: var(--text); font-size: 11px; text-align: right; }
+    .matrix-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 620px; }
+    th, td { padding: 9px 10px; border: 1px solid #e4eaed; text-align: center; font-size: 11px; }
+    th { background: var(--surface-soft); color: var(--muted); font-weight: 650; }
+    td { color: #405762; }
+    td.diag { background: #e3f1ed; color: #205e49; font-weight: 750; }
+    .footer { margin-top: 18px; color: #87969d; font-size: 10px; }
+    @media (max-width: 820px) {
+      .wrap { padding: 20px 14px 30px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .layout-two { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .top { align-items: flex-start; }
+      .model-status { display: none; }
+      .bar-row { grid-template-columns: 110px minmax(40px, 1fr) 38px; }
+      .checks { display: grid; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div class="brand-row">
+        <div class="brand-mark" aria-hidden="true">HD</div>
+        <div>
+          <div class="kicker">Operação de suporte · laboratório</div>
+          <h1>Central de triagem</h1>
+          <p class="subtitle">Sugestão de categoria, prioridade por impacto e encaminhamento para revisão.</p>
+        </div>
+      </div>
+      <div class="model-status">Modelo carregado</div>
+    </header>
+
+    <section class="metrics" aria-label="Resumo do experimento">
+      <article class="metric"><div class="metric-label">Classificador escolhido</div><div id="modelName" class="metric-value model">-</div></article>
+      <article class="metric"><div class="metric-label">Acurácia no holdout</div><div id="accuracy" class="metric-value">-</div></article>
+      <article class="metric"><div class="metric-label">Macro F1 no holdout</div><div id="macroF1" class="metric-value">-</div></article>
+      <article class="metric"><div class="metric-label">Chamados sintéticos</div><div id="samples" class="metric-value">-</div></article>
+    </section>
+
+    <section class="layout-two">
+      <form id="triageForm" class="panel">
+        <h2>Novo chamado</h2>
+        <label class="field"><span>Título</span><input id="title" placeholder="Ex.: Notebook conecta ao Wi-Fi, mas não navega" required></label>
+        <label class="field"><span>Descrição</span><textarea id="description" placeholder="Informe os sintomas, quando começou e quem foi afetado." required></textarea></label>
+        <label class="field"><span>Pessoas afetadas</span><input id="users" type="number" min="1" max="100000" value="1"></label>
+        <div class="checks">
+          <label><input id="stopped" type="checkbox"> Serviço indisponível</label>
+          <label><input id="criticalArea" type="checkbox"> Área crítica ou VIP</label>
+        </div>
+        <button class="submit" type="submit">Executar triagem</button>
+        <p class="hint">A categoria vem do classificador. A prioridade é calculada separadamente, com base nos campos de impacto.</p>
+        <p id="formError" class="review required" hidden></p>
+      </form>
+
+      <section class="panel" aria-live="polite">
+        <h2>Resultado da classificação</h2>
+        <div id="empty" class="empty">Preencha os dados do chamado e execute a triagem.</div>
+        <div id="result" style="display:none">
+          <div class="tags">
+            <span id="category" class="tag"></span>
+            <span id="priority" class="tag priority"></span>
+            <span id="confidence" class="tag"></span>
+          </div>
+          <p id="alternatives" class="result-copy"></p>
+          <h3>Checklist para o analista</h3>
+          <ol id="steps" class="steps"></ol>
+          <p id="review" class="review"></p>
+        </div>
+      </section>
+    </section>
+
+    <section class="layout-two">
+      <article class="panel">
+        <h2>Comparação dos classificadores</h2>
+        <div id="comparison" class="bars"></div>
+        <p class="note">Seleção pelo Macro F1 médio em validação cruzada, somente na parte de treino.</p>
+      </article>
+      <article class="panel">
+        <h2>F1 por categoria</h2>
+        <div id="perClass" class="bars"></div>
+        <p class="note">O holdout tem 21 exemplos. Esse resultado não representa o desempenho de uma central real.</p>
+      </article>
+    </section>
+
+    <section class="panel">
+      <h2>Matriz de confusão</h2>
+      <div id="matrix" class="matrix-wrap"></div>
+      <p class="note">Linhas representam a categoria real; colunas, a categoria prevista.</p>
+    </section>
+    <footer class="footer">Helpdesk Triage · classificação experimental de chamados · sem automação de resposta</footer>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const categoryLabels = {
+      network: "Rede",
+      hardware: "Hardware",
+      software: "Software",
+      access: "Acesso",
+      printing: "Impressão",
+      security: "Segurança",
+      other: "Outros"
+    };
+    const modelLabels = {
+      logistic_regression: "Regressão logística",
+      complement_nb: "Complement Naive Bayes",
+      sgd_log_loss: "SGD · log loss"
+    };
+    const priorityLabels = {
+      low: "Baixa",
+      medium: "Média",
+      high: "Alta",
+      critical: "Crítica"
+    };
+    const pct = (value) => Math.round(Number(value) * 100) + "%";
+    const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[char]);
+
+    function metricBars(target, rows, valueKey, labelKey) {
+      target.innerHTML = rows.map((row) => {
+        const rawLabel = row[labelKey];
+        const label = labelKey === "model"
+          ? (modelLabels[rawLabel] || rawLabel)
+          : (categoryLabels[rawLabel] || rawLabel);
+        const value = Math.max(0, Math.min(1, Number(row[valueKey])));
+        return `
+          <div class="bar-row">
+            <span class="bar-label">${escapeHtml(label)}</span>
+            <div class="bar"><i style="width:${value * 100}%"></i></div>
+            <span class="bar-value">${pct(value)}</span>
+          </div>`;
+      }).join("");
+    }
+
+    async function loadModel() {
+      const [metricsResponse, comparisonResponse, confusionResponse] = await Promise.all([
+        fetch("/model/metrics"),
+        fetch("/model/comparison"),
+        fetch("/model/confusion")
+      ]);
+      if (![metricsResponse, comparisonResponse, confusionResponse].every((response) => response.ok)) {
+        throw new Error("Não foi possível carregar os resultados do treinamento.");
+      }
+
+      const metrics = await metricsResponse.json();
+      const comparison = await comparisonResponse.json();
+      const confusion = await confusionResponse.json();
+
+      $("modelName").textContent = modelLabels[metrics.selected_model] || metrics.selected_model;
+      $("accuracy").textContent = pct(metrics.accuracy);
+      $("macroF1").textContent = pct(metrics.macro_f1);
+      $("samples").textContent = metrics.samples;
+
+      metricBars($("comparison"), comparison, "cv_macro_f1_mean", "model");
+      metricBars(
+        $("perClass"),
+        Object.entries(metrics.per_class_f1).map(([category, value]) => ({ category, value })),
+        "value",
+        "category"
+      );
+
+      const header = confusion.labels.map((label) =>
+        `<th scope="col">${escapeHtml(categoryLabels[label] || label)}</th>`
+      ).join("");
+      let table = `<table><thead><tr><th scope="col">Real / prevista</th>${header}</tr></thead><tbody>`;
+      confusion.matrix.forEach((row, rowIndex) => {
+        table += `<tr><th scope="row">${escapeHtml(categoryLabels[confusion.labels[rowIndex]] || confusion.labels[rowIndex])}</th>`;
+        row.forEach((count, columnIndex) => {
+          table += `<td class="${rowIndex === columnIndex ? "diag" : ""}">${Number(count)}</td>`;
+        });
+        table += "</tr>";
+      });
+      $("matrix").innerHTML = table + "</tbody></table>";
+    }
+
+    async function runTriage(event) {
+      event.preventDefault();
+      $("formError").hidden = true;
+
+      const payload = {
+        title: $("title").value,
+        description: $("description").value,
+        affected_users: Number($("users").value || 1),
+        service_stopped: $("stopped").checked,
+        vip_or_critical_area: $("criticalArea").checked
+      };
+
+      try {
+        const response = await fetch("/triage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+          throw new Error("Confira o título, a descrição e a quantidade de pessoas afetadas.");
+        }
+
+        const result = await response.json();
+        $("empty").hidden = true;
+        $("result").style.display = "block";
+        $("category").textContent = "Fila sugerida: " + (categoryLabels[result.category] || result.category);
+        $("priority").textContent = "Prioridade: " + (priorityLabels[result.priority] || result.priority);
+        $("confidence").textContent = "Score do modelo: " + pct(result.confidence);
+
+        const alternatives = result.alternatives.map((item) =>
+          (categoryLabels[item.category] || item.category) + " " + pct(item.confidence)
+        );
+        $("alternatives").textContent =
+          "Outras categorias: " + alternatives.join(" · ") +
+          " | Diferença entre as duas primeiras: " + pct(result.confidence_margin || 0);
+
+        $("steps").replaceChildren(...result.suggested_next_steps.map((step) => {
+          const item = document.createElement("li");
+          item.textContent = step;
+          return item;
+        }));
+
+        const reasonLabels = {
+          security_category: "categoria de segurança",
+          critical_impact: "impacto crítico",
+          low_model_confidence: "baixa confiança do modelo",
+          ambiguous_top_predictions: "categorias com pontuações próximas"
+        };
+        const reasons = (result.human_review_reasons || []).map((reason) => reasonLabels[reason] || reason);
+        const review = $("review");
+        if (result.human_review_required) {
+          review.textContent = "Revisão humana obrigatória: " + reasons.join(", ") + ".";
+          review.classList.add("required");
+        } else {
+          review.textContent = "Nenhum gatilho automático foi acionado. A conferência do analista continua necessária.";
+          review.classList.remove("required");
+        }
+      } catch (error) {
+        $("formError").textContent = error.message || "Falha ao executar a triagem.";
+        $("formError").hidden = false;
+      }
+    }
+
+    $("triageForm").addEventListener("submit", runTriage);
+    loadModel().catch((error) => {
+      $("modelName").textContent = "Indisponível";
+      $("formError").textContent = error.message;
+      $("formError").hidden = false;
+    });
+  </script>
+</body>
+</html>

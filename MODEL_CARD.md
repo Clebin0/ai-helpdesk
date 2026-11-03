@@ -1,39 +1,35 @@
-# Modelo
+# Ficha do modelo
 
-## O que ele faz
+## Identificação
 
-O classificador recebe o texto de um chamado e tenta encaixar em uma das categorias:
+Classificador supervisionado de texto para triagem inicial de chamados de TI. O modelo ativo é escolhido durante o treinamento entre Logistic Regression, Complement Naive Bayes e SGD com `log_loss`.
 
-- network
-- hardware
-- software
-- access
-- printing
-- security
-- other
+Não é um modelo generativo. Não redige respostas, não conversa com solicitantes e não chama sistemas externos.
 
-O pipeline usa TF-IDF com n-grams de 1 e 2 termos. O classificador escolhido no treino é salvo e carregado pela API em FastAPI.
+## Uso pretendido
 
-## Dados
+Sugerir uma categoria entre `network`, `hardware`, `software`, `access`, `printing`, `security` e `other`, para apoiar uma triagem inicial em ambiente de teste.
 
-O dataset deste repositório foi montado só para teste do fluxo. Não tem chamado real, dado de usuário, credencial ou log de empresa.
+## Dados de treinamento
 
-## Como estou avaliando
+- Arquivo: `data/tickets.csv`.
+- Total: 70 exemplos sintéticos.
+- Distribuição: dez exemplos por categoria.
+- Texto: título e descrição de solicitações fictícias.
+- Divisão: 70% treino e 30% holdout, estratificada.
 
-No treino eu comparo os modelos por Macro F1 usando validação cruzada. Depois avalio o escolhido em um holdout separado.
+Nenhum ticket real, nome de cliente, e-mail, credencial ou log corporativo faz parte do dataset.
 
-Também salvo:
+## Avaliação
 
-- accuracy
-- macro F1
-- weighted F1
-- F1 por categoria
-- matriz de confusão
+Os candidatos são comparados por Macro F1 médio em cinco folds dentro do conjunto de treino. O candidato com melhor média é ajustado nesse conjunto e avaliado uma vez no holdout. São registrados accuracy, Macro F1, Weighted F1, F1 por categoria e matriz de confusão.
 
-Esses números servem para comparar versões dentro deste laboratório. Não são uma estimativa de desempenho em produção.
+O tamanho do conjunto é insuficiente para inferir desempenho fora deste experimento. Resultados podem mudar com a versão do scikit-learn e das demais dependências.
 
-## Limites atuais
+## Revisão humana
 
-Hoje o projeto ainda não trata bem coisas como mudança de vocabulário, categorias desbalanceadas, calibração de confiança ou histórico real de chamados.
+A API sinaliza revisão para categoria de segurança, impacto crítico, confiança abaixo de 0,72 ou margem inferior a 0,12 entre as duas primeiras classes. A prioridade vem de regras separadas do classificador.
 
-Chamados de segurança, incidentes críticos e previsões com confiança baixa continuam marcados para revisão manual.
+## Fora do escopo
+
+Uso autônomo em produção, decisão de incidentes, resposta automática ao cliente, diagnóstico de segurança e substituição da análise de um técnico. Antes de qualquer uso com dados reais, é necessário obter autorização, remover dados pessoais, rever a distribuição das classes e validar o modelo com quem atende os chamados.

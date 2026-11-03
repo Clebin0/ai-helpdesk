@@ -1,73 +1,68 @@
-# AI Helpdesk ML
+# Helpdesk Triage
 
-Triagem explicável de chamados de suporte com NLP, comparação de modelos e revisão humana orientada por risco.
+Experimento de classificação de chamados de TI com machine learning tradicional. O objetivo é sugerir uma fila e destacar casos que não devem seguir sem análise de uma pessoa.
 
-## Visão geral
+![Painel de triagem](docs/screenshots/dashboard.png)
 
-O projeto classifica o texto de um chamado em categorias de suporte usando um pipeline TF-IDF. Os candidatos são comparados por Macro F1 médio em validação cruzada estratificada. O melhor modelo é avaliado em um holdout separado e servido por uma API FastAPI.
+## O que o classificador faz
 
-## Demonstração
+O texto do título e da descrição passa por normalização e TF-IDF (termos isolados e pares de termos). Durante o treinamento, três classificadores são comparados:
 
-![AI Helpdesk dashboard](docs/screenshots/dashboard.png)
+- Logistic Regression
+- Complement Naive Bayes
+- SGD com perda logarítmica
 
-As métricas exibidas foram calculadas sobre o dataset sintético versionado no repositório e não representam desempenho de produção.
+A seleção usa Macro F1 médio em validação cruzada estratificada no conjunto de treino. Depois, o modelo escolhido é medido em um holdout separado. A API expõe as métricas, a comparação e a matriz de confusão para que o resultado não fique escondido atrás de uma única porcentagem.
 
-## Funcionalidades
+**Não é um chatbot e não usa um LLM.** O modelo classifica texto; não escreve respostas para clientes, não altera chamados e não executa ações em infraestrutura.
 
-- Classificação em network, hardware, software, access, printing, security e other.
-- Comparação entre Logistic Regression, Complement Naive Bayes e SGD com log loss.
-- Métricas de Accuracy, Macro F1, Weighted F1 e F1 por categoria.
-- Matriz de confusão e comparação dos modelos.
-- Prioridade operacional calculada separadamente da categoria prevista.
-- Top 3 previsões, confiança e margem entre as duas principais classes.
-- Motivos explícitos para exigir revisão humana: categoria de segurança, impacto crítico, baixa confiança ou predições ambíguas.
-- Triagem em lote com contagem dos casos que exigem revisão.
-- Playbooks de próximos passos por categoria.
+## Dados usados no experimento
 
-## Stack
+O arquivo `data/tickets.csv` contém 70 exemplos sintéticos: dez por categoria (`network`, `hardware`, `software`, `access`, `printing`, `security` e `other`). A divisão é estratificada, com 70% para treino e 30% para holdout. A validação cruzada acontece somente dentro da parte de treino.
 
-- Python 3.12+
-- FastAPI e Pydantic
-- scikit-learn, pandas e joblib
-- pytest e HTTPX
+Esse conjunto é pequeno e foi escrito para exercitar o pipeline. As métricas atuais servem para comparar os experimentos deste repositório; não devem ser interpretadas como desempenho esperado em uma central de atendimento real.
 
-## Executar localmente
+## Categoria e prioridade são coisas diferentes
 
-Windows PowerShell:
+O classificador sugere a categoria. A prioridade é calculada por regras operacionais a partir de indisponibilidade, quantidade de pessoas afetadas e indicação de área crítica.
 
-~~~powershell
+A API exige revisão humana quando ocorre pelo menos uma destas condições:
+
+- A categoria sugerida é segurança.
+- O impacto calculado é crítico.
+- A confiança prevista fica abaixo de 0,72.
+- A diferença entre as duas categorias mais prováveis fica abaixo de 0,12.
+
+Esses limites são parâmetros iniciais do laboratório, não uma política universal. A probabilidade retornada pelo classificador não é uma confiança calibrada nem garantia de acerto.
+
+## Executar
+
+Requisitos: Python 3.12 ou superior.
+
+```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python train.py
 uvicorn app:app --reload
-~~~
+```
 
-Abra http://127.0.0.1:8000.
+Abra [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
-## Testes
+## Endpoints
 
-~~~bash
-python -m pytest -q
-python -m compileall -q .
-~~~
-
-A suíte inclui previsões conhecidas, escalonamento de segurança, revisão por ambiguidade, impacto crítico, triagem em lote e validação de entradas.
-
-## API principal
-
-| Método | Rota | Objetivo |
+| Método | Rota | Descrição |
 |---|---|---|
-| GET | /health | Estado e modelo selecionado |
-| GET | /model/metrics | Métricas do holdout |
-| GET | /model/comparison | Comparação de modelos |
-| GET | /model/confusion | Matriz de confusão |
-| POST | /triage | Triagem individual |
-| POST | /triage/batch | Triagem de até 100 chamados |
+| GET | `/health` | Estado da API e modelo carregado |
+| GET | `/model/metrics` | Métricas do holdout |
+| GET | `/model/comparison` | Resultado da validação cruzada |
+| GET | `/model/confusion` | Matriz de confusão |
+| POST | `/triage` | Classificar um chamado |
+| POST | `/triage/batch` | Classificar até 100 chamados |
 
-Exemplo de requisição:
+Exemplo de entrada:
 
-~~~json
+```json
 {
   "title": "Sem acesso à internet",
   "description": "O notebook conecta ao Wi-Fi, mas não resolve DNS.",
@@ -75,14 +70,16 @@ Exemplo de requisição:
   "service_stopped": false,
   "vip_or_critical_area": false
 }
-~~~
+```
 
-## Avaliação responsável
+## Testes
 
-O dataset é sintético e pequeno. As métricas servem para demonstrar o pipeline e comparar experimentos; não estimam desempenho em ambiente real.
+```bash
+python -m pytest -q
+```
 
-Confiança do classificador não é garantia de correção. Chamados de segurança, críticos, ambíguos ou com baixa confiança são sinalizados para revisão humana. A API não envia respostas automaticamente a clientes nem executa ações em infraestrutura.
+Os testes cobrem categorias conhecidas, cálculo de prioridade, encaminhamento obrigatório para revisão, triagem em lote e validação de entrada.
 
-## Dados e privacidade
+## O que falta para um uso real
 
-Não use tickets, nomes, e-mails, identificadores, logs ou conteúdo de empresas reais. Para experiências com dados reais, anonimize a origem e valide base legal, controle de acesso, retenção e segurança antes de treinar qualquer modelo.
+O dataset precisa ser substituído ou complementado por chamados representativos, anonimizados e autorizados. Também faltam monitoramento de qualidade, calibração das probabilidades, análise de deriva, versionamento formal dos modelos e avaliação com analistas. Até isso existir, a saída deve ser tratada como sugestão.
