@@ -21,15 +21,19 @@ The initial vector search scans the local SQLite collection. This keeps the lear
 
 ## Configure locally (PowerShell)
 
-Create independent random tokens for chat access and document ingestion. Do not put real credentials in source code, README files, screenshots or GitHub Actions logs.
+Copy `.env.example` to `.env` and fill in the values locally. The application loads `.env` automatically at startup. Keep `.env` private; it is ignored by Git.
 
-    $env:OPENAI_API_KEY = 'your-openai-api-key'
-    $env:ASSISTANT_ACCESS_TOKEN = 'generate-a-long-random-chat-token'
-    $env:ASSISTANT_ADMIN_TOKEN = 'generate-a-different-admin-token'
-    $env:OPENAI_CHAT_MODEL = 'gpt-6-luna'
-    $env:OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small'
+    Copy-Item .env.example .env
+    notepad .env
+
+Set `OPENAI_API_KEY` to an API key created in your OpenAI Platform project. Generate two different random values for `ASSISTANT_ACCESS_TOKEN` and `ASSISTANT_ADMIN_TOKEN`; do not reuse the API key. For example, run this twice and use a different output for each token:
+
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+Keep `OPENAI_CHAT_MODEL=gpt-6-luna` and `OPENAI_EMBEDDING_MODEL=text-embedding-3-small` unless you intentionally choose other models available to your API project.
 
     python -m pip install -r requirements.txt
+    python train.py
     uvicorn app:app --reload
 
 Open http://127.0.0.1:8000/docs.
