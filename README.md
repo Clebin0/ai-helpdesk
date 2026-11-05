@@ -78,6 +78,8 @@ O módulo RAG possui um benchmark local com documentos e perguntas sintéticos e
 
 ```bash
 python scripts/evaluate_rag.py --top-k 4 --repeats 3
+# compare um limite de relevância sem alterar o .env
+python scripts/evaluate_rag.py --top-k 4 --repeats 3 --min-relevance 0.32
 ```
 
 Para auditar citações de respostas capturadas, use o formato de `evaluation/answers.example.json` e passe o arquivo com `--answers`. A auditoria verifica integridade dos IDs e alinhamento com fontes esperadas; não substitui avaliação humana de suporte semântico.
