@@ -254,19 +254,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--hybrid-semantic-weight",
         type=float,
-        default=0.55,
+        default=0.80,
         help="Peso do score vetorial no reranking híbrido (0 a 1).",
     )
     parser.add_argument(
         "--hybrid-min-lexical-coverage",
         type=float,
-        default=0.25,
+        default=0.10,
         help="Cobertura lexical IDF mínima para aceitar um candidato (0 a 1).",
     )
     parser.add_argument(
         "--hybrid-semantic-rescue",
         type=float,
-        default=0.60,
+        default=0.55,
         help="Score vetorial mínimo para aceitar paráfrase com baixa cobertura lexical (0 a 1).",
     )
     parser.add_argument(
