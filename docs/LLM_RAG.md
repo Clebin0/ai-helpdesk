@@ -133,6 +133,40 @@ Para usar OpenAI em uma instalação com créditos, defina LLM_PROVIDER=openai, 
 
 Ao mudar o modelo de embedding, os vetores de outro modelo não são comparáveis. Reindexe os documentos que deseja consultar com o novo modelo; os vetores antigos são mantidos sob o namespace anterior.
 
+## Avaliação do RAG (benchmark local)
+
+O repositório inclui um benchmark reproduzível com **8 documentos sintéticos e 8 perguntas em português**. Ele mede a recuperação feita pelo embedding local real, sem chamar o modelo de chat e sem consumir créditos de inferência.
+
+Execute na raiz do repositório, com o ambiente virtual ativado:
+
+    python scripts/evaluate_rag.py --top-k 4 --repeats 3
+
+Opcionalmente, salve o relatório JSON:
+
+    python scripts/evaluate_rag.py --top-k 4 --repeats 3 --output evaluation/results/latest.json
+
+O benchmark usa por padrão `data/rag-benchmark.sqlite3`, separado de `data/assistant.sqlite3`. Assim, os documentos sintéticos não são misturados à base de conhecimento do copiloto. O primeiro uso do FastEmbed pode baixar o modelo de embeddings; depois, a indexação e as consultas são executadas localmente. O Ollama não precisa estar ativo para medir a recuperação.
+
+### Métricas
+
+- **Recall@K:** proporção das fontes esperadas encontradas entre as K primeiras fontes únicas.
+- **Precision@K:** proporção das K posições ocupadas por fontes esperadas.
+- **MRR:** posição da primeira fonte esperada; quanto mais cedo ela aparece, maior a pontuação.
+- **Hit Rate@K:** proporção de perguntas com pelo menos uma fonte esperada recuperada.
+- **Latência:** média, mediana e p95 das consultas, após a indexação. A primeira inicialização/download do modelo não entra no tempo de consulta.
+
+Os resultados são calculados por fonte única, não por chunk: vários trechos do mesmo documento não ocupam várias posições do ranking. O relatório também registra o modelo de embedding, o número de repetições e o tempo de indexação.
+
+### Auditoria das citações
+
+Para avaliar respostas capturadas do assistente, prepare um JSON com `query_id`, `answer` e `sources`, seguindo o formato de `evaluation/answers.example.json`. Depois execute:
+
+    python scripts/evaluate_rag.py --answers caminho/para/respostas.json
+
+A auditoria mede se os identificadores [S1], [S2] etc. existem nos metadados retornados e se apontam para fontes esperadas pelo benchmark. Ela **não prova que o trecho citado sustenta semanticamente cada afirmação**. Essa verificação exige revisão humana ou um protocolo de avaliação semântica separado.
+
+O corpus e as perguntas são artificiais e servem para comparar alterações no retriever. Não representam chamados reais nem garantem desempenho em produção. Mantenha o mesmo corpus, modelo de embedding, K e configuração ao comparar execuções.
+
 ## Segurança e limitações
 
 O conteúdo recuperado e o histórico do navegador são dados não confiáveis. Instruções inseridas em documentos ou no histórico não podem alterar o papel do assistente. Fatos organizacionais devem ser sustentados pelo contexto recuperado. O assistente não solicita senhas, tokens ou códigos MFA e não executa ações em sistemas.
