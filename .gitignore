@@ -8,3 +8,5 @@ artifacts/model_comparison.json
 artifacts/confusion_matrix.json
 .env
 data/*.sqlite3
+# Generated RAG benchmark reports
+/evaluation/results/
