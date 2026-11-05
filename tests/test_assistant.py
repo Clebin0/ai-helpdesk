@@ -140,3 +140,53 @@ def test_api_rejects_extra_fields():
         json={"question": "How do I troubleshoot DNS?", "raw_api_key": "no"},
     )
     assert response.status_code == 422
+
+
+class FakeProviderResponse:
+    def json(self):
+        return {
+            "error": {
+                "code": "credit_balance_exhausted",
+                "type": "insufficient_quota",
+            }
+        }
+
+
+class FakeProviderQuotaError(Exception):
+    status_code = 429
+    response = FakeProviderResponse()
+
+
+def test_ingest_reports_exhausted_openai_credits(monkeypatch, tmp_path):
+    configure_test_environment(monkeypatch, tmp_path)
+
+    def fail_ingestion(source, content):
+        raise FakeProviderQuotaError("provider quota exhausted")
+
+    monkeypatch.setattr(assistant_core, "ingest_document", fail_ingestion)
+    response = client.post(
+        "/assistant/ingest",
+        headers={"X-Admin-Token": "test-admin-token"},
+        json={
+            "source": "network-runbook.md",
+            "content": "DNS diagnostics: verify the resolver and gateway.",
+        },
+    )
+    assert response.status_code == 402
+    assert "sem créditos disponíveis" in response.json()["detail"]
+
+
+def test_chat_reports_exhausted_openai_credits(monkeypatch, tmp_path):
+    configure_test_environment(monkeypatch, tmp_path)
+
+    def fail_answer(question, top_k=4):
+        raise FakeProviderQuotaError("provider quota exhausted")
+
+    monkeypatch.setattr(assistant_core, "answer_question", fail_answer)
+    response = client.post(
+        "/assistant/chat",
+        headers={"X-Assistant-Token": "test-chat-token"},
+        json={"question": "Como diagnosticar DNS?"},
+    )
+    assert response.status_code == 402
+    assert "sem créditos disponíveis" in response.json()["detail"]
