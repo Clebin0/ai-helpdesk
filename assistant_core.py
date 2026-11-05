@@ -370,13 +370,19 @@ def generate_answer(question: str, retrieved: list[dict[str, Any]]) -> str:
                 {"role": "system", "content": instructions},
                 {"role": "user", "content": prompt},
             ],
-            "max_tokens": 240 if provider == "ollama" else 650,
+            "max_tokens": 160 if provider == "ollama" else 650,
             "temperature": 0.2,
         }
         if provider == "ollama":
-            request_options["reasoning_effort"] = "none"
+            # Ollama expects think as a top-level chat parameter, not inside options.
+            # Qwen 3.5 otherwise spends much of the output budget on hidden reasoning.
             request_options["extra_body"] = {
-                "options": {"num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "4096"))}
+                "think": False,
+                "options": {
+                    "num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "2048")),
+                    "num_predict": int(os.getenv("OLLAMA_NUM_PREDICT", "160")),
+                    "num_thread": int(os.getenv("OLLAMA_NUM_THREADS", "6")),
+                },
             }
         response = client.chat.completions.create(**request_options)
         answer = response.choices[0].message.content
