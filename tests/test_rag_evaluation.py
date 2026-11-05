@@ -4,6 +4,7 @@ import pytest
 
 from rag_evaluation import (
     audit_citations,
+    evaluate_abstention,
     evaluate_citation_answers,
     evaluate_retrieval,
 )
@@ -161,3 +162,64 @@ def test_committed_benchmark_dataset_has_valid_expected_sources():
     assert all(query["expected_sources"] for query in dataset["queries"])
     assert all(set(query["expected_sources"]) <= sources for query in dataset["queries"])
     assert all(len(document["content"]) <= 500 for document in dataset["documents"])
+
+
+
+def test_abstention_metrics_distinguish_correct_abstention_from_missed_answers():
+    cases = [
+        {"id":"dns","answerable":True,"expected_sources":["dns.md"]},
+        {"id":"printer","answerable":True,"expected_sources":["printer.md"]},
+        {"id":"vpn","answerable":False,"expected_sources":[]},
+        {"id":"bios","answerable":False,"expected_sources":[]},
+    ]
+    retrieved = {
+        "dns":[{"source":"dns.md","score":0.9}],
+        "printer":[{"source":"gateway.md","score":0.8}],
+        "vpn":[{"source":"network.md","score":0.7}],
+        "bios":[],
+    }
+
+    result = evaluate_abstention(cases,retrieved,top_k=4)
+
+    assert result["correct_abstentions"] == 1
+    assert result["missed_answerable_queries"] == 0
+    assert result["false_answers_on_unsupported_queries"] == 1
+    assert result["answered_without_expected_evidence"] == 1
+    assert result["answerability_accuracy"] == 0.5
+    assert result["abstention_precision"] == 1.0
+    assert result["abstention_recall"] == 0.5
+    assert result["abstention_f1"] == pytest.approx(2/3)
+    assert result["answerable_retrieval_coverage"] == 0.5
+    assert result["evidence_precision_among_answered_queries"] == pytest.approx(1/3)
+
+
+def test_abstention_rejects_invalid_labels_and_empty_gold_sets():
+    with pytest.raises(ValueError,match="boolean answerable"):
+        evaluate_abstention([{"id":"q","expected_sources":[]}],{})
+    with pytest.raises(ValueError,match="needs expected_sources"):
+        evaluate_abstention([{"id":"q","answerable":True,"expected_sources":[]}],{})
+    with pytest.raises(ValueError,match="must have empty expected_sources"):
+        evaluate_abstention([{"id":"q","answerable":False,"expected_sources":["dns.md"]}],{})
+
+
+def test_committed_benchmark_v2_has_canonical_paraphrase_and_unanswerable_cases():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    dataset = json.loads((root / "evaluation" / "benchmark.json").read_text(encoding="utf-8"))
+    sources = {document["source"] for document in dataset["documents"]}
+    cases = dataset["queries"]
+    ids = {case["id"] for case in cases}
+
+    assert dataset["version"] == 2
+    assert len(dataset["documents"]) == 8
+    assert len(cases) == 21
+    assert len(ids) == len(cases)
+    assert sum(case["type"] == "canonical" for case in cases) == 8
+    assert sum(case["type"] == "paraphrase" for case in cases) == 8
+    assert sum(case["type"] == "unanswerable" for case in cases) == 5
+    assert all(case["answerable"] is True and case["expected_sources"] for case in cases if case["type"] != "unanswerable")
+    assert all(case["answerable"] is False and not case["expected_sources"] for case in cases if case["type"] == "unanswerable")
+    assert all(set(case["expected_sources"]) <= sources for case in cases)
+    assert all(case["variant_of"] in ids for case in cases if case["type"] == "paraphrase")
