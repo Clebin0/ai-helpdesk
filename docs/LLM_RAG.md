@@ -121,7 +121,13 @@ O Hugging Face continua disponível como alternativa:
     HF_TOKEN=seu_token
     HF_CHAT_MODEL=Qwen/Qwen3.5-9B:cheapest
 
-O token precisa da permissão Make calls to Inference Providers. A conta testada retornou HTTP 402 exigindo créditos pré-pagos ou créditos incluídos em plano PRO. Por isso, o modo Hugging Face não é o padrão e não deve ser tratado como gratuito para essa conta.
+O token precisa da permissão **Make calls to Inference Providers**. Segundo a documentação atual do Hugging Face, contas Free recebem US$ 0,10 em créditos mensais para Inference Providers; esse valor pode mudar e não representa uso ilimitado. O modelo e o provedor selecionados determinam o consumo. O sufixo `:cheapest` seleciona o provedor de menor custo disponível para o modelo.
+
+O projeto limita a geração do Hugging Face a 220 tokens por resposta por padrão. Ajuste `HF_MAX_TOKENS` entre 64 e 2048 no arquivo `.env` para controlar o tamanho máximo de saída. Para economizar a cota experimental, mantenha respostas curtas.
+
+Se a API retornar **HTTP 402**, não há saldo utilizável para aquela chamada ou o crédito disponível foi insuficiente. Confira o saldo e o uso na página de cobrança do Hugging Face antes de repetir a solicitação. A permissão do token autentica a chamada, mas não concede créditos extras. Consulte os valores atuais em https://huggingface.co/docs/inference-providers/pricing.
+
+O modo Hugging Face permanece opcional. Para desenvolvimento contínuo sem cobrança por chamada, mantenha `LLM_PROVIDER=ollama` e execute o modelo localmente.
 
 Para usar OpenAI em uma instalação com créditos, defina LLM_PROVIDER=openai, RAG_EMBEDDING_PROVIDER=openai e configure OPENAI_API_KEY e os nomes de modelos.
 
