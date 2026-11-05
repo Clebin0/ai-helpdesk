@@ -29,13 +29,13 @@ def tokenize(text: str) -> list[str]:
         "anexos": "anexo",
         "arquivos": "arquivo",
         "usuarios": "usuario",
-        "usuarios": "usuario",
         "redes": "rede",
         "processos": "processo",
         "documentos": "documento",
         "politicas": "politica",
         "chaves": "chave",
         "suspeito": "suspeita",
+        "suspeitos": "suspeita",
     }
     return [
         token_forms.get(token, token)
