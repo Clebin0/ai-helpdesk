@@ -61,6 +61,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     except ImportError:
         pass
 
+    if args.min_relevance is not None:
+        os.environ["RAG_MIN_RELEVANCE"] = str(args.min_relevance)
+
     # Keep benchmark vectors isolated from the user's assistant knowledge base.
     os.environ["RAG_DB_PATH"] = str(db_path)
 
@@ -178,6 +181,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--top-k", type=int, default=4, help="Número de fontes únicas avaliadas (1 a 8).")
     parser.add_argument("--repeats", type=int, default=3, help="Repetições por pergunta para medir latência.")
     parser.add_argument(
+        "--min-relevance",
+        type=float,
+        default=None,
+        help="Sobrescreve RAG_MIN_RELEVANCE apenas durante esta execução (0 a 1).",
+    )
+    parser.add_argument(
         "--answers",
         type=Path,
         help="JSON opcional com respostas reais e metadados de fontes para auditar citações.",
@@ -192,6 +201,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--top-k precisa ficar entre 1 e 8.")
     if not 1 <= args.repeats <= 20:
         parser.error("--repeats precisa ficar entre 1 e 20.")
+    if args.min_relevance is not None and not 0 <= args.min_relevance <= 1:
+        parser.error("--min-relevance precisa ficar entre 0 e 1.")
     return args
 
 
