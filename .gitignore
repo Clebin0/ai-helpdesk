@@ -7,3 +7,4 @@ artifacts/metrics.json
 artifacts/model_comparison.json
 artifacts/confusion_matrix.json
 .env
+data/*.sqlite3

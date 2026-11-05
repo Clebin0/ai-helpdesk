@@ -14,7 +14,7 @@ O texto do título e da descrição passa por normalização e TF-IDF (termos is
 
 A seleção usa Macro F1 médio em validação cruzada estratificada no conjunto de treino. Depois, o modelo escolhido é medido em um holdout separado. A API expõe as métricas, a comparação e a matriz de confusão para que o resultado não fique escondido atrás de uma única porcentagem.
 
-**Não é um chatbot e não usa um LLM.** O modelo classifica texto; não escreve respostas para clientes, não altera chamados e não executa ações em infraestrutura.
+**O classificador não é um chatbot e não usa um LLM.** Ele classifica texto e continua separado do novo módulo experimental LLM RAG Assistant, documentado em [docs/LLM_RAG.md](docs/LLM_RAG.md). O assistente recupera trechos de documentação e gera respostas com fontes; não altera chamados nem executa ações em infraestrutura.
 
 ## Dados usados no experimento
 
@@ -83,3 +83,15 @@ Os testes cobrem categorias conhecidas, cálculo de prioridade, encaminhamento o
 ## O que falta para um uso real
 
 O dataset precisa ser substituído ou complementado por chamados representativos, anonimizados e autorizados. Também faltam monitoramento de qualidade, calibração das probabilidades, análise de deriva, versionamento formal dos modelos e avaliação com analistas. Até isso existir, a saída deve ser tratada como sugestão.
+
+## LLM & RAG Assistant (módulo experimental)
+
+O repositório agora também contém um assistente separado do classificador tradicional. Ele usa embeddings para recuperar trechos de documentação e a Responses API para redigir respostas com referências às fontes.
+
+- Ingestão autenticada de documentos autorizados.
+- Embeddings e busca semântica local em SQLite.
+- Respostas fundamentadas no contexto recuperado, com citações [S1], [S2].
+- Abstenção quando a recuperação não encontra material relevante.
+- Tokens separados para chat e administração; nenhuma chave é armazenada no código.
+
+Consulte [docs/LLM_RAG.md](docs/LLM_RAG.md) para configuração, chamadas de API, segurança e limitações. Para executar o módulo com a API da OpenAI, você precisa fornecer sua própria chave e configurar os dois tokens de acesso. O uso da API pode gerar custos.

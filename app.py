@@ -14,7 +14,7 @@ from ml import load_model, read_comparison, read_confusion, read_metrics
 LOW_CONFIDENCE_THRESHOLD = 0.72
 LOW_MARGIN_THRESHOLD = 0.12
 
-app = FastAPI(title="Helpdesk Triage Lab", version="4.1.0")
+app = FastAPI(title="Helpdesk Triage Lab", version="4.2.0")
 MODEL = load_model()
 MODEL_METRICS = read_metrics()
 
@@ -175,7 +175,7 @@ def home():
 def health():
     return {
         "status": "ok",
-        "version": "4.1.0",
+        "version": "4.2.0",
         "model": MODEL_METRICS["selected_model"],
     }
 
@@ -211,3 +211,8 @@ def triage_batch(body: BatchIn):
         "by_priority": dict(Counter(result["priority"] for result in results)),
         "results": results,
     }
+
+
+from assistant_api import router as assistant_router
+
+app.include_router(assistant_router)
