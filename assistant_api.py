@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
 import secrets
+from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Header, HTTPException
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 import assistant_core
@@ -20,9 +24,15 @@ class IngestRequest(AssistantInput):
     content: str = Field(min_length=20, max_length=80_000)
 
 
+class ChatTurn(AssistantInput):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=1_200)
+
+
 class ChatRequest(AssistantInput):
     question: str = Field(min_length=5, max_length=3_000)
     top_k: int = Field(default=4, ge=1, le=8)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=8)
 
 
 def _authorize(provided: str | None, variable: str) -> None:
@@ -64,8 +74,8 @@ def _provider_rate_limit_error(exc: Exception) -> HTTPException | None:
             status_code=402,
             detail=(
                 "A cota de inferência da Hugging Face foi esgotada ou a conta não tem "
-                "créditos disponíveis. O plano gratuito inclui uma pequena cota mensal; "
-                "o aplicativo não compra créditos nem habilita cobrança adicional."
+                "créditos disponíveis. O aplicativo não compra créditos nem habilita "
+                "cobrança adicional."
             ),
         )
 
@@ -88,6 +98,27 @@ def _provider_rate_limit_error(exc: Exception) -> HTTPException | None:
         )
 
     return None
+
+
+def _ndjson(payload: dict) -> str:
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"
+
+
+def _chat_error(exc: Exception) -> str:
+    provider_error = _provider_rate_limit_error(exc)
+    if provider_error is not None:
+        return str(provider_error.detail)
+    if isinstance(exc, RuntimeError):
+        return str(exc)
+    return "Não foi possível gerar a resposta. Verifique se o Ollama está ativo e tente novamente."
+
+
+@router.get("/ui", response_class=HTMLResponse, include_in_schema=False)
+def assistant_chat_ui():
+    page = Path(__file__).resolve().with_name("assistant_chat.html")
+    if not page.is_file():
+        raise HTTPException(status_code=404, detail="Chat interface not found.")
+    return page.read_text(encoding="utf-8")
 
 
 @router.get("/health")
@@ -142,8 +173,13 @@ def assistant_chat(
     x_assistant_token: str | None = Header(default=None),
 ):
     _authorize(x_assistant_token, "ASSISTANT_ACCESS_TOKEN")
+    history = [turn.model_dump() for turn in body.history]
     try:
-        return assistant_core.answer_question(body.question, top_k=body.top_k)
+        return assistant_core.answer_question(
+            body.question,
+            top_k=body.top_k,
+            history=history,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
@@ -154,3 +190,73 @@ def assistant_chat(
             status_code=502,
             detail="Assistant request failed. Check server logs and provider configuration.",
         ) from exc
+
+
+@router.post("/chat/stream")
+def assistant_chat_stream(
+    body: ChatRequest,
+    x_assistant_token: str | None = Header(default=None),
+):
+    _authorize(x_assistant_token, "ASSISTANT_ACCESS_TOKEN")
+    history = [turn.model_dump() for turn in body.history]
+
+    try:
+        query = assistant_core.retrieval_query(body.question, history)
+        relevant = assistant_core.relevant_chunks(query, top_k=body.top_k)
+        sources = assistant_core.source_metadata(relevant)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        provider_error = _provider_rate_limit_error(exc)
+        if provider_error is not None:
+            raise provider_error from exc
+        raise HTTPException(
+            status_code=502,
+            detail="Assistant retrieval failed. Check server logs and local embeddings.",
+        ) from exc
+
+    def events():
+        yield _ndjson(
+            {
+                "type": "meta",
+                "model": assistant_core.chat_model(),
+                "retrieval_model": assistant_core.embedding_model(),
+                "sources": sources,
+                "used_llm": bool(relevant),
+            }
+        )
+
+        if not relevant:
+            yield _ndjson(
+                {
+                    "type": "token",
+                    "text": (
+                        "Não encontrei trechos suficientemente relacionados na base de "
+                        "conhecimento. Não vou completar a resposta com suposições. "
+                        "Adicione documentação relevante ou reformule a pergunta."
+                    ),
+                }
+            )
+            yield _ndjson({"type": "done"})
+            return
+
+        try:
+            for fragment in assistant_core.generate_answer_stream(
+                body.question, relevant, history
+            ):
+                if fragment:
+                    yield _ndjson({"type": "token", "text": fragment})
+            yield _ndjson({"type": "done"})
+        except Exception as exc:
+            yield _ndjson({"type": "error", "detail": _chat_error(exc)})
+
+    return StreamingResponse(
+        events(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
+    )

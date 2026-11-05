@@ -86,13 +86,14 @@ O dataset precisa ser substituído ou complementado por chamados representativos
 
 ## LLM & RAG Assistant (módulo experimental)
 
-O repositório agora também contém um assistente separado do classificador tradicional, acessível pelo painel Assistente de IA na página inicial. Ele usa embeddings para recuperar trechos de documentação e a Responses API para redigir respostas com referências às fontes.
+O repositório também contém um copiloto de suporte separado do classificador tradicional. O padrão executa Qwen 3.5 localmente via Ollama e usa FastEmbed/ONNX para embeddings locais.
 
+- Chat web em [/assistant/ui](http://127.0.0.1:8001/assistant/ui), com respostas em streaming e histórico limitado à sessão.
 - Ingestão autenticada de documentos autorizados.
 - Embeddings e busca semântica local em SQLite.
 - Respostas fundamentadas no contexto recuperado, com citações [S1], [S2].
 - Abstenção quando a recuperação não encontra material relevante.
-- Interface web de chat com referências às fontes e token guardado apenas na sessão do navegador.
-- Tokens separados para chat e administração; nenhuma chave é armazenada no código.
+- Tokens separados para chat e administração; nenhum token é armazenado no código.
+- Hugging Face e OpenAI continuam como provedores opcionais, sujeitos a disponibilidade e créditos.
 
-Consulte [docs/LLM_RAG.md](docs/LLM_RAG.md) para configuração, interface web, chamadas de API, segurança e limitações. Para executar o módulo com a API da OpenAI, você precisa fornecer sua própria chave e configurar os dois tokens de acesso. O uso da API pode gerar custos.
+Consulte [docs/LLM_RAG.md](docs/LLM_RAG.md) para configuração, interface, chamadas de API, segurança e limitações.

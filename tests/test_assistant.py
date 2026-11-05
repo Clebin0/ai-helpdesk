@@ -115,7 +115,7 @@ def test_api_ingest_and_chat_return_cited_sources(monkeypatch, tmp_path):
     monkeypatch.setattr(
         assistant_core,
         "generate_answer",
-        lambda question, retrieved: "Verifique o resolvedor DNS e o gateway [S1].",
+        lambda question, retrieved, history=None: "Verifique o resolvedor DNS e o gateway [S1].",
     )
     ingested = client.post(
         "/assistant/ingest",
@@ -198,7 +198,7 @@ def test_ingest_reports_exhausted_provider_credits(monkeypatch, tmp_path):
 def test_chat_reports_exhausted_provider_credits(monkeypatch, tmp_path):
     configure_test_environment(monkeypatch, tmp_path)
 
-    def fail_answer(question, top_k=4):
+    def fail_answer(question, top_k=4, history=None):
         raise FakeProviderQuotaError("provider quota exhausted")
 
     monkeypatch.setattr(assistant_core, "answer_question", fail_answer)
@@ -250,45 +250,122 @@ def test_huggingface_chat_uses_openai_compatible_router(monkeypatch):
 
 
 
-def test_ollama_chat_uses_local_openai_compatible_endpoint(monkeypatch):
+
+
+
+def test_ollama_payload_disables_thinking_and_keeps_model_warm(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
     monkeypatch.setenv("OLLAMA_CHAT_MODEL", "qwen3.5:4b-q4_K_M")
     monkeypatch.setenv("OLLAMA_NUM_CTX", "2048")
     monkeypatch.setenv("OLLAMA_NUM_PREDICT", "160")
-    monkeypatch.setenv("OLLAMA_NUM_THREADS", "6")
+    monkeypatch.setenv("OLLAMA_KEEP_ALIVE", "30m")
 
-    class FakeMessage:
-        content = "Verifique o resolvedor DNS e execute nslookup [S1]."
-
-    class FakeChoice:
-        message = FakeMessage()
-
-    class FakeResponse:
-        choices = [FakeChoice()]
-
-    class FakeCompletions:
-        def __init__(self):
-            self.call = None
-
-        def create(self, **kwargs):
-            self.call = kwargs
-            return FakeResponse()
-
-    completions = FakeCompletions()
-
-    class FakeClient:
-        chat = type("Chat", (), {"completions": completions})()
-
-    monkeypatch.setattr(assistant_core, "_ollama_client", lambda: FakeClient())
-    answer = assistant_core.generate_answer(
-        "Como testar DNS?",
-        [{"source": "dns.md", "chunk_index": 0, "content": "Teste o resolvedor DNS."}],
+    payload = assistant_core._ollama_payload(
+        [{"role": "user", "content": "Responda objetivamente."}],
+        stream=True,
     )
 
-    assert answer == "Verifique o resolvedor DNS e execute nslookup [S1]."
-    assert completions.call["model"] == "qwen3.5:4b-q4_K_M"
-    assert completions.call["max_tokens"] == 160
-    assert completions.call["extra_body"]["think"] is False
-    assert completions.call["extra_body"]["options"]["num_ctx"] == 2048
-    assert completions.call["extra_body"]["options"]["num_predict"] == 160
-    assert completions.call["extra_body"]["options"]["num_thread"] == 6
+    assert payload["model"] == "qwen3.5:4b-q4_K_M"
+    assert payload["stream"] is True
+    assert payload["think"] is False
+    assert payload["keep_alive"] == "30m"
+    assert payload["options"]["num_ctx"] == 2048
+    assert payload["options"]["num_predict"] == 160
+    assert payload["options"]["num_thread"] == 6
+
+
+def test_ollama_stream_parses_incremental_ndjson(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setenv("OLLAMA_CHAT_MODEL", "qwen3.5:4b-q4_K_M")
+    captured = {}
+
+    class FakeStreamResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def raise_for_status(self):
+            return None
+
+        def iter_lines(self):
+            import json
+            yield json.dumps({"message": {"content": "Primeiro "}, "done": False})
+            yield json.dumps({"message": {"content": "segundo."}, "done": False})
+            yield json.dumps({"message": {"content": ""}, "done": True})
+
+    def fake_request(messages, stream):
+        captured["messages"] = messages
+        captured["stream"] = stream
+        return FakeStreamResponse()
+
+    monkeypatch.setattr(assistant_core, "_ollama_request", fake_request)
+    history = [{"role": "user", "content": "Estou investigando DNS."}]
+    chunks = list(
+        assistant_core.generate_answer_stream(
+            "E no Windows?",
+            [{"source": "dns.md", "chunk_index": 0, "content": "Execute nslookup."}],
+            history,
+        )
+    )
+
+    assert chunks == ["Primeiro ", "segundo."]
+    assert captured["stream"] is True
+    assert "Estou investigando DNS." in captured["messages"][1]["content"]
+    assert "E no Windows?" in captured["messages"][1]["content"]
+
+
+def test_stream_endpoint_emits_metadata_tokens_and_done(monkeypatch, tmp_path):
+    configure_test_environment(monkeypatch, tmp_path)
+    relevant = [
+        {
+            "source": "network-runbook.md",
+            "chunk_index": 0,
+            "content": "Execute nslookup para validar a resolução DNS.",
+            "score": 0.91,
+        }
+    ]
+    received_history = []
+    monkeypatch.setattr(assistant_core, "relevant_chunks", lambda question, top_k=4: relevant)
+    monkeypatch.setattr(assistant_core, "source_metadata", lambda rows: [
+        {"citation": "S1", "source": "network-runbook.md", "chunk_index": 0, "relevance": 0.91}
+    ])
+
+    def fake_stream(question, retrieved, history=None):
+        received_history.extend(history or [])
+        yield "Execute "
+        yield "nslookup [S1]."
+
+    monkeypatch.setattr(assistant_core, "generate_answer_stream", fake_stream)
+    response = client.post(
+        "/assistant/chat/stream",
+        headers={"X-Assistant-Token": "test-chat-token"},
+        json={
+            "question": "Como testar DNS no Windows?",
+            "history": [{"role": "user", "content": "O problema começou hoje."}],
+        },
+    )
+
+    assert response.status_code == 200
+    events = [__import__("json").loads(line) for line in response.text.splitlines() if line]
+    assert [event["type"] for event in events] == ["meta", "token", "token", "done"]
+    assert events[0]["sources"][0]["citation"] == "S1"
+    assert events[1]["text"] + events[2]["text"] == "Execute nslookup [S1]."
+    assert received_history[0]["content"] == "O problema começou hoje."
+
+
+def test_stream_endpoint_requires_chat_token():
+    response = client.post(
+        "/assistant/chat/stream",
+        json={"question": "Como diagnosticar DNS?"},
+    )
+    assert response.status_code == 401
+
+
+def test_chat_ui_route_serves_interface():
+    response = client.get("/assistant/ui")
+    assert response.status_code == 200
+    assert "Copiloto de suporte" in response.text
+    assert "/assistant/chat/stream" in response.text
+    assert "sessionStorage" in response.text

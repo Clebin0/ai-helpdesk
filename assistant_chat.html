@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>AI Helpdesk · Copiloto</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1020;--sidebar:#0d1426;--surface:#111a2e;--surface2:#162139;--line:#253451;--text:#edf3ff;--muted:#91a1bd;--muted2:#6f809e;--accent:#7c9cff;--success:#57d6a1;--warning:#f0bd6d;--danger:#ff8585}
+    *{box-sizing:border-box}html,body{min-height:100%}body{margin:0;background:radial-gradient(ellipse at 78% -15%,rgba(77,111,201,.13),transparent 44%),var(--bg);color:var(--text);font:14px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}button,input,textarea{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}
+    .app{min-height:100vh;display:grid;grid-template-columns:258px minmax(0,1fr)}.sidebar{display:flex;flex-direction:column;gap:28px;min-height:100vh;padding:24px 17px 18px;background:rgba(11,17,32,.82);border-right:1px solid #1e2a43}
+    .brand{display:flex;align-items:center;gap:12px;padding:0 6px}.brand-mark{width:41px;height:41px;display:grid;place-items:center;border:1px solid rgba(151,176,255,.35);border-radius:13px;background:linear-gradient(145deg,#3856a9,#202e5b);color:white;font-size:12px;font-weight:850;letter-spacing:.04em;box-shadow:0 8px 26px rgba(54,86,172,.2)}.brand-name{font-size:14px;font-weight:800;letter-spacing:-.02em}.brand-sub{color:var(--muted2);font-size:10px;margin-top:1px}
+    .nav-group{display:grid;gap:7px}.nav-label{color:#647694;padding:0 11px 4px;font-size:10px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}.nav-link{display:flex;align-items:center;gap:11px;min-height:41px;padding:9px 11px;border:1px solid transparent;border-radius:10px;color:#aab8d0;font-size:12px;font-weight:650;transition:background .15s,color .15s,border-color .15s}.nav-link:hover{background:rgba(255,255,255,.035);color:var(--text)}.nav-link.active{background:rgba(124,156,255,.12);border-color:rgba(124,156,255,.18);color:#dce6ff}.nav-icon{width:18px;text-align:center;font-size:15px}
+    .side-card{margin-top:auto;padding:14px 13px;border:1px solid var(--line);border-radius:13px;background:linear-gradient(145deg,rgba(25,39,68,.85),rgba(15,24,43,.9))}.side-card-head{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:750}.dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 0 4px rgba(87,214,161,.1)}.side-model{margin-top:10px;color:#dbe5fa;font-size:11px;font-weight:650;overflow-wrap:anywhere}.side-meta{margin-top:5px;color:var(--muted2);font-size:10px}.side-note{margin:12px 0 0;padding-top:11px;border-top:1px solid var(--line);color:var(--muted);font-size:10px}.sidebar-footer{color:#596985;font-size:10px;padding:0 6px}
+    .main{min-width:0;display:flex;flex-direction:column;min-height:100vh}.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:21px clamp(20px,4vw,52px);border-bottom:1px solid #1e2a43;background:rgba(11,16,32,.45)}.eyebrow{color:var(--accent);font-size:10px;font-weight:850;letter-spacing:.14em;text-transform:uppercase}h1{margin:3px 0 0;font-size:22px;letter-spacing:-.04em;font-weight:780}.top-sub{margin:3px 0 0;color:var(--muted);font-size:11px}.top-actions{display:flex;align-items:center;gap:9px}
+    .connection{display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid rgba(87,214,161,.2);border-radius:999px;background:rgba(87,214,161,.07);color:#9ae9c8;font-size:10px;font-weight:750;white-space:nowrap}.connection .dot{width:6px;height:6px;box-shadow:none}.ghost-btn,.icon-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:8px 11px;border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.025);color:#bdc9df;font-size:11px;font-weight:700}.ghost-btn:hover,.icon-btn:hover{background:rgba(124,156,255,.1);border-color:#3b507c;color:white}
+    .content{width:min(100%,1080px);margin:0 auto;padding:24px clamp(17px,4vw,48px) 16px;flex:1;display:flex;flex-direction:column}.notice{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:1px solid rgba(240,189,109,.16);border-radius:11px;background:rgba(240,189,109,.055);color:#c7b18c;font-size:10px}.notice strong{color:#f0cf9b}.notice-icon{color:var(--warning);font-size:14px;line-height:1.2}
+    .messages{flex:1;display:flex;flex-direction:column;gap:21px;min-height:390px;padding:25px 0 20px}.welcome{max-width:720px;margin:auto;padding:28px 10px 44px;text-align:center}.welcome-symbol{width:57px;height:57px;display:grid;place-items:center;margin:0 auto 19px;border-radius:18px;background:linear-gradient(145deg,rgba(124,156,255,.24),rgba(87,118,211,.08));border:1px solid rgba(124,156,255,.28);color:#b8cbff;font-size:24px}.welcome h2{margin:0;font-size:clamp(22px,3vw,29px);letter-spacing:-.045em}.welcome p{max-width:520px;margin:9px auto 23px;color:var(--muted);font-size:12px}.suggestions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;text-align:left}.suggestion{min-height:90px;padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(18,28,48,.65);color:#c5d0e5;text-align:left;transition:.15s}.suggestion:hover{transform:translateY(-2px);border-color:#536eae;background:rgba(124,156,255,.08)}.suggestion strong{display:block;font-size:11px;margin-bottom:5px}.suggestion span{color:var(--muted);font-size:10px;line-height:1.4}
+    .message{display:flex;gap:11px;align-items:flex-start;max-width:850px;width:100%}.message.user{align-self:flex-end;flex-direction:row-reverse}.avatar{flex:0 0 31px;width:31px;height:31px;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;background:#17233c;color:#9fb7ff;font-size:10px;font-weight:850}.user .avatar{background:#26365a;border-color:#3d5488;color:#e0e9ff}.message-main{min-width:0;max-width:min(790px,calc(100% - 45px))}.message-meta{display:flex;align-items:center;gap:8px;margin:0 0 5px 2px;color:var(--muted2);font-size:10px}.user .message-meta{justify-content:flex-end;margin-right:2px}.bubble{padding:12px 15px;border:1px solid var(--line);border-radius:4px 14px 14px 14px;background:linear-gradient(145deg,rgba(21,32,54,.95),rgba(16,25,44,.95));color:#dbe5f8;font-size:12px;line-height:1.75;overflow-wrap:anywhere;white-space:normal}.user .bubble{border-color:rgba(124,156,255,.2);border-radius:14px 4px 14px 14px;background:rgba(57,79,135,.27);color:#e6edff}.bubble p{margin:0 0 9px}.bubble p:last-child{margin-bottom:0}.bubble ul,.bubble ol{margin:7px 0;padding-left:21px}.bubble li{margin:3px 0}.bubble strong{color:white}.bubble code{padding:2px 5px;border:1px solid #344461;border-radius:5px;background:#0b1427;color:#b9ceff;font-size:11px}.citation{color:#a8bdff;font-size:10px;font-weight:800}
+    .sources{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}.source{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid rgba(124,156,255,.18);border-radius:7px;background:rgba(124,156,255,.06);color:#aabef5;font-size:9px}.source b{color:#d6e1ff}.message-foot{margin:6px 0 0 2px;color:#6e7e9b;font-size:9px}.user .message-foot{text-align:right}.typing{display:inline-flex;align-items:center;gap:4px;padding:4px 0}.typing i{width:5px;height:5px;border-radius:50%;background:#9db2f7;animation:pulse 1.1s infinite}.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}@keyframes pulse{0%,70%,100%{opacity:.25;transform:translateY(0)}35%{opacity:1;transform:translateY(-3px)}}
+    .composer-wrap{position:sticky;bottom:0;padding:11px 0 10px;background:linear-gradient(180deg,rgba(11,16,32,0),var(--bg) 20%)}.composer{display:flex;align-items:flex-end;gap:10px;padding:10px 10px 10px 15px;border:1px solid #30415f;border-radius:15px;background:#121d32;box-shadow:0 12px 36px rgba(0,0,0,.2)}.composer:focus-within{border-color:#5b78c3;box-shadow:0 0 0 3px rgba(124,156,255,.08),0 12px 36px rgba(0,0,0,.2)}.composer textarea{width:100%;min-height:28px;max-height:160px;resize:none;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:12px;line-height:1.55}.composer textarea::placeholder{color:#71819d}.send-btn{flex:0 0 37px;width:37px;height:37px;display:grid;place-items:center;border:1px solid #7895f2;border-radius:11px;background:linear-gradient(145deg,#7998fa,#5676e3);color:white;font-size:17px;font-weight:800;box-shadow:0 5px 15px rgba(75,105,210,.2)}.send-btn:hover{filter:brightness(1.1)}.send-btn:disabled{opacity:.45;cursor:not-allowed;filter:none}.composer-hint{display:flex;justify-content:space-between;gap:10px;padding:7px 4px 0;color:#657693;font-size:9px}.page-footer{padding:0 20px 17px;color:#52627e;text-align:center;font-size:9px}
+    .token-panel{position:fixed;z-index:20;top:76px;right:27px;width:min(390px,calc(100vw - 28px));padding:17px;border:1px solid #354764;border-radius:15px;background:#121d32;box-shadow:0 25px 80px rgba(0,0,0,.55)}.token-panel[hidden]{display:none}.token-panel h3{margin:0 0 5px;font-size:14px}.token-panel p{margin:0 0 13px;color:var(--muted);font-size:10px}.token-label{display:block;margin:0 0 5px;color:#aebbd1;font-size:10px;font-weight:700}.token-input{width:100%;padding:10px 11px;outline:none;border:1px solid #354764;border-radius:8px;background:#0b1425;color:white;font-size:11px}.token-input:focus{border-color:#7895f2}.token-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.primary-btn{padding:9px 12px;border:1px solid #7895f2;border-radius:8px;background:#607fe9;color:white;font-size:10px;font-weight:800}.token-status{margin-top:9px;min-height:14px;color:var(--muted);font-size:10px}.mobile-menu{display:none}
+    @media(max-width:850px){.app{grid-template-columns:1fr}.sidebar{display:none}.topbar{padding:17px 18px}.content{padding:19px 17px 12px}.mobile-menu{display:inline-flex}.suggestions{grid-template-columns:1fr}.suggestion{min-height:0}}
+    @media(max-width:520px){.topbar{align-items:flex-start}.top-actions{flex-direction:column;align-items:flex-end}.connection{font-size:9px}.ghost-btn{min-height:32px;padding:6px 8px}.top-sub{max-width:240px}.welcome{padding-top:12px}.messages{min-height:350px}.message-main{max-width:calc(100% - 41px)}.notice{font-size:9px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <a class="brand" href="/"><div class="brand-mark">AI</div><div><div class="brand-name">Helpdesk Copilot</div><div class="brand-sub">SUPPORT INTELLIGENCE</div></div></a>
+      <nav class="nav-group" aria-label="Navegação">
+        <div class="nav-label">Workspace</div>
+        <a class="nav-link" href="/"><span class="nav-icon">▦</span> Central de triagem</a>
+        <a class="nav-link active" href="/assistant/ui"><span class="nav-icon">✳</span> Copiloto de suporte</a>
+        <a class="nav-link" href="/docs"><span class="nav-icon">⌘</span> API e documentação</a>
+      </nav>
+      <section class="side-card">
+        <div class="side-card-head"><span class="dot" id="sideDot"></span><span id="sideStatus">Verificando ambiente</span></div>
+        <div class="side-model" id="sideModel">Carregando modelo…</div>
+        <div class="side-meta" id="sideEmbedding">Embeddings locais</div>
+        <p class="side-note">O modelo roda no seu computador. As respostas usam documentos indexados e incluem fontes para conferência.</p>
+      </section>
+      <div class="sidebar-footer">AI Helpdesk · laboratório RAG</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><div class="eyebrow">AI HELPDESK / COPILOT</div><h1>Copiloto de suporte</h1><p class="top-sub">Pergunte sobre procedimentos, incidentes e documentação técnica.</p></div>
+        <div class="top-actions">
+          <div class="connection"><span class="dot" id="apiDot"></span><span id="apiStatus">Conectando API</span></div>
+          <button class="ghost-btn" id="tokenToggle" type="button">⚿ Acesso</button>
+          <button class="icon-btn" id="clearChat" type="button" title="Limpar conversa" aria-label="Limpar conversa">↺</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="notice"><span class="notice-icon">ⓘ</span><div><strong>Valide antes de executar.</strong> O copiloto não altera sistemas e não substitui os procedimentos oficiais. As afirmações específicas devem estar apoiadas nas fontes exibidas.</div></div>
+        <section class="messages" id="messages" aria-live="polite">
+          <div class="welcome" id="welcome">
+            <div class="welcome-symbol">✳</div>
+            <h2>Como posso ajudar no suporte?</h2>
+            <p>Consulte os documentos indexados para encontrar procedimentos, organizar diagnósticos e identificar quando escalar um chamado.</p>
+            <div class="suggestions">
+              <button class="suggestion" type="button" data-prompt="Como diagnosticar uma falha de resolução DNS?"><strong>Diagnóstico de DNS</strong><span>Testes iniciais, evidências e encaminhamento.</span></button>
+              <button class="suggestion" type="button" data-prompt="Quais informações devo coletar antes de escalar um incidente de rede?"><strong>Escalonar incidente</strong><span>Organize os dados necessários para infraestrutura.</span></button>
+              <button class="suggestion" type="button" data-prompt="Como documentar corretamente um erro técnico?"><strong>Documentar erro</strong><span>Registre sintomas, horários e evidências.</span></button>
+            </div>
+          </div>
+        </section>
+        <div class="composer-wrap">
+          <form class="composer" id="chatForm"><textarea id="question" rows="1" maxlength="3000" placeholder="Descreva o problema ou faça uma pergunta…" aria-label="Mensagem" required></textarea><button class="send-btn" id="sendButton" type="submit" aria-label="Enviar mensagem">↑</button></form>
+          <div class="composer-hint"><span>Enter para enviar · Shift + Enter para quebrar linha</span><span id="chatModelHint">Qwen local</span></div>
+        </div>
+      </div>
+      <footer class="page-footer">O histórico desta conversa fica apenas nesta aba e não é gravado no servidor.</footer>
+    </main>
+  </div>
+
+  <section class="token-panel" id="tokenPanel" hidden aria-label="Configurar acesso">
+    <h3>Token de acesso</h3>
+    <p>Use o ASSISTANT_ACCESS_TOKEN do arquivo .env. Ele será mantido apenas na sessão desta aba.</p>
+    <label class="token-label" for="accessToken">Token do assistente</label>
+    <input class="token-input" id="accessToken" type="password" autocomplete="off" spellcheck="false" placeholder="Cole seu token local aqui">
+    <div class="token-actions"><button class="ghost-btn" id="removeToken" type="button">Remover</button><button class="primary-btn" id="saveToken" type="button">Salvar nesta aba</button></div>
+    <div class="token-status" id="tokenStatus"></div>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const TOKEN_KEY = "ai-helpdesk-session-access";
+    const state = { history: [], busy: false, model: "modelo local" };
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      })[char]);
+    }
+    function renderText(value) {
+      const safe = escapeHtml(value);
+      const formatted = safe
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\[(S\d+)\]/g, '<span class="citation">[$1]</span>');
+      return formatted.split(/\n{2,}/).map((paragraph) =>
+        "<p>" + paragraph.replace(/\n/g, "<br>") + "</p>"
+      ).join("");
+    }
+    function getToken() { return sessionStorage.getItem(TOKEN_KEY) || ""; }
+    function setBusy(value) {
+      state.busy = value;
+      $("sendButton").disabled = value;
+      $("question").disabled = value;
+      $("sendButton").textContent = value ? "…" : "↑";
+    }
+    function scrollToBottom() {
+      $("messages").scrollTop = $("messages").scrollHeight;
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    }
+    function createMessage(role, content = "", sources = []) {
+      $("welcome").hidden = true;
+      const isUser = role === "user";
+      const wrapper = document.createElement("article");
+      wrapper.className = "message" + (isUser ? " user" : "");
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = isUser ? "EU" : "AI";
+      const main = document.createElement("div");
+      main.className = "message-main";
+      const meta = document.createElement("div");
+      meta.className = "message-meta";
+      const name = document.createElement("strong");
+      name.textContent = isUser ? "Você" : "Copiloto";
+      const time = document.createElement("span");
+      time.textContent = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      meta.append(name, time);
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.innerHTML = renderText(content);
+      const sourceBox = document.createElement("div");
+      sourceBox.className = "sources";
+      const foot = document.createElement("div");
+      foot.className = "message-foot";
+      main.append(meta, bubble, sourceBox, foot);
+      wrapper.append(avatar, main);
+      $("messages").append(wrapper);
+      if (sources.length) addSources(sourceBox, sources);
+      scrollToBottom();
+      return { wrapper, bubble, sourceBox, foot };
+    }
+    function addSources(target, sources) {
+      target.replaceChildren();
+      sources.forEach((source) => {
+        const item = document.createElement("div");
+        item.className = "source";
+        const label = document.createElement("b");
+        label.textContent = "[" + source.citation + "]";
+        const text = document.createElement("span");
+        text.textContent = source.source + " · trecho " + (Number(source.chunk_index) + 1);
+        item.append(label, text);
+        target.append(item);
+      });
+    }
+    function setConnection(ok, text) {
+      $("apiDot").style.background = ok ? "var(--success)" : "var(--danger)";
+      $("apiDot").style.boxShadow = ok ? "0 0 0 4px rgba(87,214,161,.1)" : "0 0 0 4px rgba(255,133,133,.1)";
+      $("apiStatus").textContent = text;
+      $("sideDot").style.background = ok ? "var(--success)" : "var(--danger)";
+      $("sideStatus").textContent = ok ? "API disponível" : "API indisponível";
+    }
+    async function checkHealth() {
+      try {
+        const response = await fetch("/assistant/health", { cache: "no-store" });
+        if (!response.ok) throw new Error("API indisponível");
+        const health = await response.json();
+        state.model = health.chat_model || "modelo local";
+        $("sideModel").textContent = state.model;
+        $("sideEmbedding").textContent = "Embeddings: " + (health.embedding_model || "não informado");
+        $("chatModelHint").textContent = health.llm_provider === "ollama"
+          ? "Execução local · sem créditos de API"
+          : "Provedor: " + health.llm_provider;
+        setConnection(true, "API online");
+      } catch (_) {
+        setConnection(false, "API offline");
+        $("sideModel").textContent = "Não foi possível consultar a API";
+      }
+    }
+    function showTokenPanel(open = true) {
+      $("tokenPanel").hidden = !open;
+      if (open) {
+        $("accessToken").value = getToken();
+        $("tokenStatus").textContent = getToken() ? "Token presente nesta sessão." : "Token ainda não configurado.";
+        $("accessToken").focus();
+      }
+    }
+    async function consumeStream(response, assistantMessage, startedAt) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let content = "";
+      let gotMeta = false;
+      function processLine(line) {
+        if (!line.trim()) return;
+        let event;
+        try { event = JSON.parse(line); } catch (_) { return; }
+        if (event.type === "meta") {
+          gotMeta = true;
+          addSources(assistantMessage.sourceBox, event.sources || []);
+          assistantMessage.foot.textContent = event.used_llm
+            ? "Gerado por " + (event.model || state.model)
+            : "Resposta baseada na busca documental · sem chamada ao LLM";
+        } else if (event.type === "token") {
+          content += event.text || "";
+          assistantMessage.bubble.innerHTML = renderText(content);
+          scrollToBottom();
+        } else if (event.type === "error") {
+          throw new Error(event.detail || "Falha ao gerar resposta.");
+        } else if (event.type === "done") {
+          assistantMessage.foot.textContent += " · " + ((performance.now() - startedAt) / 1000).toFixed(1) + " s";
+        }
+      }
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        lines.forEach(processLine);
+      }
+      buffer += decoder.decode();
+      if (buffer.trim()) processLine(buffer);
+      if (!gotMeta) throw new Error("A resposta do servidor veio em um formato inesperado.");
+      if (!content.trim()) throw new Error("O modelo encerrou sem retornar texto. Tente novamente.");
+      return content;
+    }
+    async function sendMessage(text) {
+      const question = String(text || "").trim();
+      if (!question || state.busy) return;
+      if (!getToken()) {
+        showTokenPanel(true);
+        $("tokenStatus").textContent = "Configure o token de acesso antes de enviar mensagens.";
+        return;
+      }
+      const history = state.history.slice(-8);
+      createMessage("user", question);
+      const assistantMessage = createMessage("assistant", "");
+      assistantMessage.bubble.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+      const startedAt = performance.now();
+      setBusy(true);
+      $("question").value = "";
+      resizeComposer();
+      try {
+        const response = await fetch("/assistant/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Assistant-Token": getToken() },
+          body: JSON.stringify({ question, top_k: 4, history })
+        });
+        if (!response.ok) {
+          let detail = "Falha na solicitação.";
+          try { detail = (await response.json()).detail || detail; } catch (_) {}
+          if (response.status === 401 || response.status === 503) {
+            showTokenPanel(true);
+            $("tokenStatus").textContent = detail;
+          }
+          throw new Error(detail);
+        }
+        const answer = await consumeStream(response, assistantMessage, startedAt);
+        state.history.push({ role: "user", content: question });
+        state.history.push({ role: "assistant", content: answer });
+        state.history = state.history.slice(-8);
+      } catch (error) {
+        assistantMessage.bubble.textContent = error.message || "Não foi possível concluir a solicitação.";
+        assistantMessage.bubble.style.borderColor = "rgba(255,133,133,.3)";
+        assistantMessage.foot.textContent = "Verifique a conexão e a configuração de acesso.";
+      } finally {
+        setBusy(false);
+        $("question").focus();
+        scrollToBottom();
+      }
+    }
+    function resizeComposer() {
+      const input = $("question");
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 160) + "px";
+    }
+    $("chatForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      sendMessage($("question").value);
+    });
+    $("question").addEventListener("input", resizeComposer);
+    $("question").addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        $("chatForm").requestSubmit();
+      }
+    });
+    document.querySelectorAll("[data-prompt]").forEach((button) => {
+      button.addEventListener("click", () => sendMessage(button.dataset.prompt));
+    });
+    $("tokenToggle").addEventListener("click", () => showTokenPanel($("tokenPanel").hidden));
+    $("saveToken").addEventListener("click", () => {
+      const token = $("accessToken").value.trim();
+      if (!token) { $("tokenStatus").textContent = "Informe um token antes de salvar."; return; }
+      sessionStorage.setItem(TOKEN_KEY, token);
+      $("tokenStatus").textContent = "Token salvo somente nesta aba.";
+      setTimeout(() => showTokenPanel(false), 650);
+    });
+    $("removeToken").addEventListener("click", () => {
+      sessionStorage.removeItem(TOKEN_KEY);
+      $("accessToken").value = "";
+      $("tokenStatus").textContent = "Token removido desta sessão.";
+    });
+    $("clearChat").addEventListener("click", () => {
+      state.history = [];
+      $("messages").replaceChildren($("welcome"));
+      $("welcome").hidden = false;
+      $("question").focus();
+    });
+    document.addEventListener("click", (event) => {
+      if (!$("tokenPanel").hidden &&
+          !$("tokenPanel").contains(event.target) &&
+          !$("tokenToggle").contains(event.target)) showTokenPanel(false);
+    });
+    checkHealth();
+    if (!getToken()) showTokenPanel(true);
+  </script>
+</body>
+</html>
