@@ -140,3 +140,19 @@ def test_citation_answer_aggregation_requires_known_unique_queries():
 
     with pytest.raises(ValueError, match="Duplicate"):
         evaluate_citation_answers(answers * 2, cases)
+
+
+def test_committed_benchmark_dataset_has_valid_expected_sources():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    dataset = json.loads((root / "evaluation" / "benchmark.json").read_text(encoding="utf-8"))
+    sources = {document["source"] for document in dataset["documents"]}
+
+    assert len(dataset["documents"]) == 8
+    assert len(dataset["queries"]) == 8
+    assert len({query["id"] for query in dataset["queries"]}) == len(dataset["queries"])
+    assert all(query["expected_sources"] for query in dataset["queries"])
+    assert all(set(query["expected_sources"]) <= sources for query in dataset["queries"])
+    assert all(len(document["content"]) <= 500 for document in dataset["documents"])
