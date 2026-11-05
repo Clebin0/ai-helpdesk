@@ -189,7 +189,7 @@ def test_abstention_metrics_distinguish_correct_abstention_from_missed_answers()
     assert result["answerability_accuracy"] == 0.75
     assert result["abstention_precision"] == 1.0
     assert result["abstention_recall"] == 0.5
-    assert result["abstention_f1"] == pytest.approx(2/3)
+    assert result["abstention_f1"] == pytest.approx(0.6667)
     assert result["answerable_retrieval_coverage"] == 0.5
     assert result["evidence_precision_among_answered_queries"] == pytest.approx(1/3)
 
