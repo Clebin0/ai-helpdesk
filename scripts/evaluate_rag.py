@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from hybrid_retrieval import rerank_hybrid
+from lexical_retrieval import FTS5Index, reciprocal_rank_fusion
 from rag_evaluation import evaluate_abstention, evaluate_citation_answers, evaluate_retrieval
 
 
@@ -95,6 +96,25 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         indexed_documents.append(result)
     indexing_seconds = time.perf_counter() - index_started
 
+    lexical_index: FTS5Index | None = None
+    if args.retrieval_mode == "rrf":
+        lexical_chunks: list[dict[str, Any]] = []
+        for document in documents:
+            for chunk_index, content in enumerate(
+                assistant_core.chunk_text(str(document["content"]))
+            ):
+                lexical_chunks.append(
+                    {
+                        "source": str(document["source"]),
+                        "chunk_index": chunk_index,
+                        "content": content,
+                    }
+                )
+        try:
+            lexical_index = FTS5Index(lexical_chunks)
+        except RuntimeError as exc:
+            raise SystemExit(str(exc)) from exc
+
     retrieved_by_query: dict[str, list[dict[str, Any]]] = {}
     query_latencies_ms: list[float] = []
     per_query_latency: list[dict[str, Any]] = []
@@ -105,14 +125,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         retrieved: list[dict[str, Any]] = []
         for _ in range(args.repeats):
             started = time.perf_counter()
-            # Semantic mode reproduces the live assistant. Hybrid mode reranks
-            # up to eight dense candidates with lexical query coverage.
+            # semantic reproduces production; hybrid reranks dense candidates;
+            # rrf independently ranks with FTS5/BM25 and fuses both lists.
             if args.retrieval_mode == "semantic":
                 retrieved = assistant_core.relevant_chunks(
                     str(case["question"]),
                     top_k=args.top_k,
                 )
-            else:
+            elif args.retrieval_mode == "hybrid":
                 candidates = assistant_core.retrieve_chunks(
                     str(case["question"]),
                     top_k=8,
@@ -127,6 +147,26 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 retrieved = [
                     item for item in ranked if item["score"] >= minimum_score
                 ][: args.top_k]
+            else:
+                if lexical_index is None:
+                    raise RuntimeError("FTS5 index was not initialized for RRF mode.")
+                vector_candidates = [
+                    item
+                    for item in assistant_core.retrieve_chunks(
+                        str(case["question"]),
+                        top_k=args.rrf_candidate_depth,
+                    )
+                    if item["score"] >= minimum_score
+                ]
+                lexical_candidates = lexical_index.search(
+                    str(case["question"]),
+                    limit=args.rrf_candidate_depth,
+                )
+                retrieved = reciprocal_rank_fusion(
+                    [vector_candidates, lexical_candidates],
+                    rank_constant=args.rrf_rank_constant,
+                    limit=args.top_k,
+                )
             samples.append((time.perf_counter() - started) * 1000)
 
         retrieved_by_query[str(case["id"])] = retrieved
@@ -180,6 +220,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "semantic_rescue_threshold": args.hybrid_semantic_rescue,
             }
             if args.retrieval_mode == "hybrid" else None
+        ),
+        "rrf_parameters": (
+            {
+                "rank_constant": args.rrf_rank_constant,
+                "vector_candidate_depth": args.rrf_candidate_depth,
+                "lexical_candidate_depth": args.rrf_candidate_depth,
+                "fusion": "SQLite FTS5/BM25 + dense cosine",
+                "score_filter": "vector candidates only, before RRF",
+            }
+            if args.retrieval_mode == "rrf" else None
         ),
         "retrieval_min_relevance": float(os.getenv("RAG_MIN_RELEVANCE", "0.18")),
         "document_count": len(documents),
@@ -247,9 +297,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--retrieval-mode",
-        choices=("semantic", "hybrid"),
+        choices=("semantic", "hybrid", "rrf"),
         default="semantic",
-        help="semantic reproduz o retriever atual; hybrid ativa o reranker lexical experimental.",
+        help="semantic reproduz produção; hybrid reranqueia candidatos densos; rrf combina FTS5/BM25 independente com vetores.",
     )
     parser.add_argument(
         "--hybrid-semantic-weight",
@@ -268,6 +318,18 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.55,
         help="Score vetorial mínimo para aceitar paráfrase com baixa cobertura lexical (0 a 1).",
+    )
+    parser.add_argument(
+        "--rrf-rank-constant",
+        type=int,
+        default=60,
+        help="Constante k da fusão RRF (score = 1 / (k + posição)).",
+    )
+    parser.add_argument(
+        "--rrf-candidate-depth",
+        type=int,
+        default=8,
+        help="Profundidade independente das listas vetorial e BM25 antes da fusão (1 a 64).",
     )
     parser.add_argument(
         "--answers",
@@ -292,6 +354,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("--hybrid-min-lexical-coverage precisa ficar entre 0 e 1.")
     if not 0 <= args.hybrid_semantic_rescue <= 1:
         parser.error("--hybrid-semantic-rescue precisa ficar entre 0 e 1.")
+    if args.rrf_rank_constant < 1:
+        parser.error("--rrf-rank-constant precisa ser pelo menos 1.")
+    if not 1 <= args.rrf_candidate_depth <= 64:
+        parser.error("--rrf-candidate-depth precisa ficar entre 1 e 64.")
     return args
 
 
