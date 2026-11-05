@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
-
 import pytest
 
 from lexical_retrieval import FTS5Index, reciprocal_rank_fusion
@@ -102,7 +100,12 @@ def test_rrf_rejects_invalid_parameters(kwargs):
         reciprocal_rank_fusion([],**kwargs)
 
 
-def test_fts5_module_reports_if_sqlite_build_does_not_support_fts5(monkeypatch):
-    # The normal CI/runtime build should support FTS5. This assertion documents
-    # the explicit, actionable failure path without replacing SQLite internals.
-    assert sqlite3.sqlite_version_info >= (3, 9, 0)
+
+def test_fts5_returns_empty_for_blank_or_stopword_only_queries():
+    chunks = [
+        {"source":"dns.md","chunk_index":0,"content":"Diagnóstico de resolução DNS no Windows."}
+    ]
+
+    with FTS5Index(chunks) as index:
+        assert index.search("") == []
+        assert index.search("de e com para") == []
