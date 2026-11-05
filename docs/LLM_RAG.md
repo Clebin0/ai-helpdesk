@@ -41,7 +41,9 @@ No modo padrão, mantenha:
     LLM_PROVIDER=ollama
     OLLAMA_BASE_URL=http://127.0.0.1:11434/v1
     OLLAMA_CHAT_MODEL=qwen3.5:4b-q4_K_M
-    OLLAMA_NUM_CTX=4096
+    OLLAMA_NUM_CTX=2048
+    OLLAMA_NUM_PREDICT=160
+    OLLAMA_NUM_THREADS=6
     RAG_EMBEDDING_PROVIDER=local
 
 Preencha também ASSISTANT_ACCESS_TOKEN e ASSISTANT_ADMIN_TOKEN com valores independentes. Não reutilize credenciais de provedores. Para gerar cada token:
@@ -65,7 +67,7 @@ Esse comando não imprime os valores.
     python train.py
     uvicorn app:app --reload --port 8001
 
-Abra http://127.0.0.1:8001/docs.
+Abra http://127.0.0.1:8001/docs ou http://127.0.0.1:8001 para usar a interface web.
 
 A aplicação espera que o serviço Ollama esteja em execução. A API local do Ollama é compatível com o cliente OpenAI em http://127.0.0.1:11434/v1; o valor da chave é ignorado pelo servidor local.
 
@@ -122,3 +124,16 @@ Mantenha a API em rede confiável. Antes de expor para terceiros, use HTTPS, con
 - O limiar RAG_MIN_RELEVANCE exige avaliação com um conjunto de perguntas reais.
 - Sem memória de conversa, busca híbrida, reranker ou execução de ferramentas.
 - Faltam avaliações sistemáticas de precisão/recall, qualidade de citações, abstenção e latência. Não classifique o módulo como pronto para produção sem essas avaliações.
+
+
+## Interface web do copiloto
+
+A página inicial mantém o painel de triagem e inclui o chat RAG. O campo de token aceita ASSISTANT_ACCESS_TOKEN e o guarda apenas em sessionStorage na aba atual. O token nunca é exposto por /assistant/health. Para consultar o valor local no PowerShell sem publicá-lo no chat:
+
+    Select-String '^ASSISTANT_ACCESS_TOKEN=' .env
+
+Copie o valor diretamente para o campo do navegador. Se receber HTTP 401, confira o token no .env e informe-o novamente. O chat mostra as fontes retornadas pela API; perguntas são independentes e o histórico visual não é enviado como contexto para novas perguntas.
+
+## Ajustes de latência no Ollama
+
+O perfil padrão limita o contexto a 2048 tokens, a geração a 160 tokens e usa seis threads de CPU. Qwen 3.5 recebe think=false no nível superior da requisição para evitar gastar o orçamento de saída com raciocínio oculto quando o caso pede uma resposta operacional curta. Esses valores podem ser ajustados em OLLAMA_NUM_CTX, OLLAMA_NUM_PREDICT e OLLAMA_NUM_THREADS. Menor contexto/saída tende a reduzir latência e consumo de memória, mas respostas longas podem ser truncadas.
