@@ -185,3 +185,136 @@ def evaluate_citation_answers(
         "per_answer": audits,
         "semantic_entailment_evaluated": False,
     }
+
+
+def evaluate_abstention(
+    cases: list[dict[str, Any]],
+    retrieved_by_query: dict[str, list[dict[str, Any]]],
+    *,
+    top_k: int = 4,
+) -> dict[str, Any]:
+    """Measure retriever-level abstention for answerable and unsupported queries.
+
+    An empty result is treated as an abstention, matching the assistant's current
+    no-context path. This does not inspect or score generated LLM text.
+    """
+    if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k < 1:
+        raise ValueError("top_k must be a positive integer.")
+
+    seen: set[str] = set()
+    per_query: list[dict[str, Any]] = []
+    correct_abstentions = 0
+    missed_answers = 0
+    false_answers = 0
+    answerable_with_evidence = 0
+    answered_without_evidence = 0
+    answered_count = 0
+    answerable_count = 0
+    unanswerable_count = 0
+
+    for case in cases:
+        query_id = str(case.get("id", "")).strip()
+        if not query_id:
+            raise ValueError("Every benchmark case must have a non-empty id.")
+        if query_id in seen:
+            raise ValueError(f"Duplicate benchmark query id: {query_id}")
+        seen.add(query_id)
+
+        answerable = case.get("answerable")
+        if not isinstance(answerable, bool):
+            raise ValueError(f"Benchmark case {query_id} must define boolean answerable.")
+
+        expected = {
+            str(source).strip()
+            for source in case.get("expected_sources", [])
+            if str(source).strip()
+        }
+        if answerable and not expected:
+            raise ValueError(f"Answerable benchmark case {query_id} needs expected_sources.")
+        if not answerable and expected:
+            raise ValueError(f"Unanswerable benchmark case {query_id} must have empty expected_sources.")
+
+        returned = _unique_sources(retrieved_by_query.get(query_id, []))[:top_k]
+        abstained = not returned
+        predicted_answerable = not abstained
+        relevant = bool(set(returned) & expected) if answerable else False
+
+        if answerable:
+            answerable_count += 1
+            if abstained:
+                missed_answers += 1
+                outcome = "missed_answer"
+            elif relevant:
+                answerable_with_evidence += 1
+                answered_count += 1
+                outcome = "answered_with_expected_evidence"
+            else:
+                answered_without_evidence += 1
+                answered_count += 1
+                outcome = "answered_without_expected_evidence"
+        else:
+            unanswerable_count += 1
+            if abstained:
+                correct_abstentions += 1
+                outcome = "correct_abstention"
+            else:
+                false_answers += 1
+                answered_count += 1
+                outcome = "false_answer_on_unsupported_query"
+
+        per_query.append(
+            {
+                "query_id": query_id,
+                "answerable": answerable,
+                "predicted_answerable": predicted_answerable,
+                "abstained": abstained,
+                "expected_sources": sorted(expected),
+                "retrieved_sources": returned,
+                "retrieved_expected_evidence": relevant,
+                "outcome": outcome,
+            }
+        )
+
+    if not per_query:
+        raise ValueError("The benchmark must contain at least one query.")
+    if not answerable_count or not unanswerable_count:
+        raise ValueError("The benchmark needs both answerable and unanswerable queries.")
+
+    abstention_precision = (
+        correct_abstentions / (correct_abstentions + missed_answers)
+        if correct_abstentions + missed_answers else 0.0
+    )
+    abstention_recall = (
+        correct_abstentions / (correct_abstentions + false_answers)
+        if correct_abstentions + false_answers else 0.0
+    )
+    abstention_f1 = (
+        2 * abstention_precision * abstention_recall
+        / (abstention_precision + abstention_recall)
+        if abstention_precision + abstention_recall else 0.0
+    )
+    correct_answerability = correct_abstentions + answerable_count - missed_answers
+    answered_with_evidence = answerable_with_evidence
+    accuracy = correct_answerability / len(per_query)
+
+    return {
+        "query_count": len(per_query),
+        "answerable_query_count": answerable_count,
+        "unanswerable_query_count": unanswerable_count,
+        "correct_abstentions": correct_abstentions,
+        "missed_answerable_queries": missed_answers,
+        "false_answers_on_unsupported_queries": false_answers,
+        "answered_without_expected_evidence": answered_without_evidence,
+        "answerability_accuracy": round(accuracy, 4),
+        "abstention_precision": round(abstention_precision, 4),
+        "abstention_recall": round(abstention_recall, 4),
+        "abstention_f1": round(abstention_f1, 4),
+        "answerable_retrieval_coverage": round(
+            answerable_with_evidence / answerable_count, 4
+        ),
+        "evidence_precision_among_answered_queries": round(
+            answered_with_evidence / answered_count, 4
+        ) if answered_count else 0.0,
+        "per_query": per_query,
+        "scope": "retriever_only; generated LLM refusal text is not evaluated",
+    }
