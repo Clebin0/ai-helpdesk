@@ -253,7 +253,9 @@ def test_huggingface_chat_uses_openai_compatible_router(monkeypatch):
 def test_ollama_chat_uses_local_openai_compatible_endpoint(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
     monkeypatch.setenv("OLLAMA_CHAT_MODEL", "qwen3.5:4b-q4_K_M")
-    monkeypatch.setenv("OLLAMA_NUM_CTX", "4096")
+    monkeypatch.setenv("OLLAMA_NUM_CTX", "2048")
+    monkeypatch.setenv("OLLAMA_NUM_PREDICT", "160")
+    monkeypatch.setenv("OLLAMA_NUM_THREADS", "6")
 
     class FakeMessage:
         content = "Verifique o resolvedor DNS e execute nslookup [S1]."
@@ -285,6 +287,8 @@ def test_ollama_chat_uses_local_openai_compatible_endpoint(monkeypatch):
 
     assert answer == "Verifique o resolvedor DNS e execute nslookup [S1]."
     assert completions.call["model"] == "qwen3.5:4b-q4_K_M"
-    assert completions.call["max_tokens"] == 240
-    assert completions.call["reasoning_effort"] == "none"
-    assert completions.call["extra_body"]["options"]["num_ctx"] == 4096
+    assert completions.call["max_tokens"] == 160
+    assert completions.call["extra_body"]["think"] is False
+    assert completions.call["extra_body"]["options"]["num_ctx"] == 2048
+    assert completions.call["extra_body"]["options"]["num_predict"] == 160
+    assert completions.call["extra_body"]["options"]["num_thread"] == 6
