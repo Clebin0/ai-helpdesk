@@ -1,0 +1,81 @@
+{
+  "name": "AI Helpdesk RAG retrieval benchmark",
+  "version": 1,
+  "description": "Synthetic Portuguese IT-support queries and documents. No customer or company data.",
+  "documents": [
+    {
+      "source": "dns-resolution.md",
+      "content": "Diagnóstico de resolução DNS no Windows. Execute ipconfig /all para conferir os servidores DNS configurados. Use nslookup exemplo.com para testar a resolução de nomes. Compare o resultado com outro resolvedor aprovado. ipconfig /flushdns limpa o cache DNS local. Registre o servidor consultado e a mensagem de erro."
+    },
+    {
+      "source": "network-gateway.md",
+      "content": "Diagnóstico de conectividade de rede. Execute ipconfig para identificar o gateway padrão. Teste ping no gateway e depois um endereço IP externo autorizado. Se o IP responde mas nomes não resolvem, investigue DNS. Registre perda de pacotes, latência e interfaces afetadas."
+    },
+    {
+      "source": "printer-queue.md",
+      "content": "Fila de impressão parada. Verifique a fila de documentos pendentes, a conexão USB ou de rede, o driver e o serviço Spooler de Impressão do Windows. Teste uma página de impressão. Não remova drivers nem reinicie serviços em produção sem aprovação."
+    },
+    {
+      "source": "account-access.md",
+      "content": "Falha de acesso a contas. Confirme o usuário e a aplicação afetada, verifique o status de bloqueio no diretório e a validade da conta. Oriente a redefinição pelo fluxo oficial. Nunca solicite senha, token ou código MFA."
+    },
+    {
+      "source": "phishing-response.md",
+      "content": "Suspeita de phishing por e-mail. Não clique em links nem abra anexos. Registre remetente, assunto e horário, preserve os cabeçalhos e encaminhe a mensagem à equipe de segurança pelo canal aprovado. Não compartilhe o conteúdo com terceiros."
+    },
+    {
+      "source": "api-timeout.md",
+      "content": "Investigação de timeout em API REST. Registre endpoint, método HTTP, horário, request ID, status e latência. Compare a saúde do serviço e os logs autorizados. Diferencie erro 5xx, timeout de conexão e limite 429. Nunca exponha chaves ou tokens."
+    },
+    {
+      "source": "backup-restore.md",
+      "content": "Restauração de backup. Confirme escopo, ponto no tempo, proprietário e aprovação. Verifique integridade e destino isolado antes de restaurar. Não sobrescreva ambientes de produção sem autorização registrada e plano de reversão."
+    },
+    {
+      "source": "disk-space.md",
+      "content": "Diagnóstico de pouco espaço em disco. Verifique capacidade, percentual livre, volume, arquivos temporários, logs e crescimento recente. Registre o volume afetado. Não remova arquivos ou dados corporativos sem aprovação."
+    }
+  ],
+  "queries": [
+    {
+      "id": "dns-windows",
+      "question": "Como testar se o problema é DNS no Windows?",
+      "expected_sources": ["dns-resolution.md"]
+    },
+    {
+      "id": "gateway-but-no-sites",
+      "question": "Consigo pingar o gateway mas os nomes dos sites não abrem. O que verificar?",
+      "expected_sources": ["dns-resolution.md", "network-gateway.md"]
+    },
+    {
+      "id": "printer-stuck",
+      "question": "A impressora tem documentos parados na fila e não imprime. Como investigar?",
+      "expected_sources": ["printer-queue.md"]
+    },
+    {
+      "id": "account-locked",
+      "question": "Um usuário está bloqueado e não consegue acessar a aplicação. O que conferir?",
+      "expected_sources": ["account-access.md"]
+    },
+    {
+      "id": "phishing-email",
+      "question": "Recebi um e-mail suspeito com link estranho. Qual é o procedimento inicial?",
+      "expected_sources": ["phishing-response.md"]
+    },
+    {
+      "id": "api-timeout",
+      "question": "Um endpoint REST está demorando e encerrando por timeout. Quais evidências coletar?",
+      "expected_sources": ["api-timeout.md"]
+    },
+    {
+      "id": "restore-backup",
+      "question": "Como recuperar arquivos de uma cópia de segurança com segurança?",
+      "expected_sources": ["backup-restore.md"]
+    },
+    {
+      "id": "disk-full",
+      "question": "O notebook está ficando sem espaço no SSD. O que devo analisar?",
+      "expected_sources": ["disk-space.md"]
+    }
+  ]
+}
