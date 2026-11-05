@@ -82,9 +82,11 @@ python scripts/evaluate_rag.py --top-k 4 --repeats 3
 python scripts/evaluate_rag.py --top-k 4 --repeats 3 --min-relevance 0.32
 # compare o reranker lexical experimental (não usado no chat)
 python scripts/evaluate_rag.py --retrieval-mode hybrid --top-k 4 --repeats 3 --min-relevance 0.18
+# compare FTS5/BM25 + Reciprocal Rank Fusion (também experimental)
+python scripts/evaluate_rag.py --retrieval-mode rrf --top-k 4 --repeats 3 --min-relevance 0.18 --rrf-bm25-cutoff -2.5
 ```
 
-Para auditar citações de respostas capturadas, use o formato de `evaluation/answers.example.json` e passe o arquivo com `--answers`. A auditoria verifica integridade dos IDs e alinhamento com fontes esperadas; não substitui avaliação humana de suporte semântico. A avaliação v2 também mede a abstenção do retriever, não a qualidade textual da recusa do LLM. O modo `hybrid` é um reranker lexical experimental sobre candidatos vetoriais; no corpus sintético, elevou Precision of returned para 91,67% e acertou 5/5 abstenções, mas permanece fora do caminho de produção.
+Para auditar citações de respostas capturadas, use o formato de `evaluation/answers.example.json` e passe o arquivo com `--answers`. A auditoria verifica integridade dos IDs e alinhamento com fontes esperadas; não substitui avaliação humana de suporte semântico. A avaliação v2 também mede a abstenção do retriever, não a qualidade textual da recusa do LLM. O modo hybrid é um reranker lexical experimental sobre candidatos vetoriais. O modo rrf adiciona busca BM25 independente com SQLite FTS5 e Reciprocal Rank Fusion; neste corpus, obteve 93,75% de Recall@4, 91,67% de Precision of returned e 5/5 abstenções corretas. Ambos permanecem fora do caminho de produção.
 
 Veja [docs/LLM_RAG.md](docs/LLM_RAG.md) para métricas, limitações e detalhes de execução. Os resultados medidos localmente estão em [evaluation/RESULTS.md](evaluation/RESULTS.md).
 
