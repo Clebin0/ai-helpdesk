@@ -61,6 +61,7 @@ def evaluate_retrieval(
         hits = len(set(ranked) & expected)
         recall = hits / len(expected)
         precision = hits / top_k
+        precision_returned = hits / len(ranked) if ranked else 0.0
         reciprocal_rank = 1.0 / relevant_ranks[0] if relevant_ranks else 0.0
 
         per_query.append(
@@ -70,6 +71,8 @@ def evaluate_retrieval(
                 "retrieved_sources": ranked,
                 "recall_at_k": round(recall, 4),
                 "precision_at_k": round(precision, 4),
+                "precision_of_returned": round(precision_returned, 4),
+                "returned_source_count": len(ranked),
                 "reciprocal_rank": round(reciprocal_rank, 4),
                 "hit_at_k": bool(hits),
             }
@@ -83,6 +86,12 @@ def evaluate_retrieval(
         "query_count": len(per_query),
         "recall_at_k": round(mean(item["recall_at_k"] for item in per_query), 4),
         "precision_at_k": round(mean(item["precision_at_k"] for item in per_query), 4),
+        "precision_of_returned": round(
+            mean(item["precision_of_returned"] for item in per_query), 4
+        ),
+        "average_sources_returned": round(
+            mean(item["returned_source_count"] for item in per_query), 2
+        ),
         "mrr": round(mean(item["reciprocal_rank"] for item in per_query), 4),
         "hit_rate_at_k": round(mean(float(item["hit_at_k"]) for item in per_query), 4),
         "per_query": per_query,
