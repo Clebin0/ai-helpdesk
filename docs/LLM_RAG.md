@@ -135,7 +135,7 @@ Ao mudar o modelo de embedding, os vetores de outro modelo não são comparávei
 
 ## Avaliação do RAG (benchmark local)
 
-O repositório inclui um benchmark reproduzível com **8 documentos sintéticos e 8 perguntas em português**. Ele mede a recuperação feita pelo embedding local real, sem chamar o modelo de chat e sem consumir créditos de inferência.
+O repositório inclui um benchmark reproduzível com **8 documentos sintéticos e 21 perguntas em português**: 8 canônicas, 8 paráfrases e 5 consultas sem resposta prevista. Ele mede a recuperação feita pelo embedding local real, sem chamar o modelo de chat e sem consumir créditos de inferência.
 
 Execute na raiz do repositório, com o ambiente virtual ativado:
 
@@ -159,7 +159,7 @@ O benchmark usa por padrão `data/rag-benchmark.sqlite3`, separado de `data/assi
 - **Average sources returned:** quantidade média de fontes fornecidas ao contexto por pergunta.
 - **MRR:** posição da primeira fonte esperada; quanto mais cedo ela aparece, maior a pontuação.
 - **Hit Rate@K:** proporção de perguntas com pelo menos uma fonte esperada recuperada.
-- **Latência:** média, mediana e p95 das consultas, após a indexação. A primeira inicialização/download do modelo não entra no tempo de consulta.
+- **Latência:** média, mediana e p95 das consultas, após a indexação. A primeira inicialização/download do modelo não entra no tempo de consulta.\n- **Answerability accuracy:** acurácia da decisão do retriever entre retornar fontes e se abster, usando o rótulo answerable do dataset.\n- **Abstention precision/recall/F1:** mede se o retriever ficou sem resultados justamente nas consultas sem resposta prevista.\n- **Answerable retrieval coverage:** proporção das perguntas respondíveis que recuperam pelo menos uma fonte esperada.\n- **Evidence precision among answered queries:** proporção das consultas respondidas que recuperam ao menos uma fonte esperada.
 
 Os resultados são calculados por fonte única, não por chunk: vários trechos do mesmo documento não ocupam várias posições do ranking. O relatório também registra o modelo de embedding, o número de repetições e o tempo de indexação.
 
@@ -171,7 +171,7 @@ Para avaliar respostas capturadas do assistente, prepare um JSON com `query_id`,
 
 A auditoria mede se os identificadores [S1], [S2] etc. existem nos metadados retornados e se apontam para fontes esperadas pelo benchmark. Ela **não prova que o trecho citado sustenta semanticamente cada afirmação**. Essa verificação exige revisão humana ou um protocolo de avaliação semântica separado.
 
-O valor passado em `--min-relevance` vale apenas naquela execução. Compare Recall@K, Precision of returned e a quantidade de fontes retornadas; um corte alto demais pode remover uma fonte necessária. O valor 0.32 é um ponto de experimentação observado neste corpus sintético, não uma configuração universal recomendada.
+O valor passado em `--min-relevance` vale apenas naquela execução. Compare Recall@K, Precision of returned, as métricas de abstenção e a quantidade de fontes retornadas; um corte alto demais pode remover uma fonte necessária. No benchmark v2, 0.18 retornou fontes indevidas para as cinco consultas sem resposta. A varredura encontrou 100% de abstenção com 0.55, mas o recall caiu para 53,1%. Isso mostra que o threshold sozinho não resolve o problema; 0.18 permanece como padrão de produção enquanto recuperação híbrida e reranking são avaliados.
 
 O corpus e as perguntas são artificiais e servem para comparar alterações no retriever. Não representam chamados reais nem garantem desempenho em produção. Mantenha o mesmo corpus, modelo de embedding, K e configuração ao comparar execuções.
 
@@ -185,4 +185,4 @@ Mantenha a API em rede confiável. Antes de expor para terceiros, use HTTPS, con
 - Chunking baseado em caracteres, não tokens.
 - O limiar RAG_MIN_RELEVANCE exige avaliação com perguntas reais.
 - O histórico é limitado aos últimos oito turnos e existe apenas na sessão atual.
-- Faltam avaliações sistemáticas de precisão/recall, qualidade de citações, abstenção e latência. Não classifique o módulo como pronto para produção sem essas avaliações.
+- O benchmark é sintético e pequeno; faltam dados representativos autorizados, revisão semântica humana de citações, teste da recusa textual do LLM, recuperação híbrida e reranking. Não classifique o módulo como pronto para produção sem essas avaliações.
