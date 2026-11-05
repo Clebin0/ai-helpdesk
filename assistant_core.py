@@ -47,6 +47,17 @@ def chat_model() -> str:
     raise RuntimeError("LLM_PROVIDER must be 'ollama', 'huggingface' or 'openai'.")
 
 
+def hf_max_tokens() -> int:
+    """Return a bounded generation limit to keep hosted inference usage predictable."""
+    try:
+        limit = int(os.getenv("HF_MAX_TOKENS", "220"))
+    except ValueError as exc:
+        raise RuntimeError("HF_MAX_TOKENS must be an integer between 64 and 2048.") from exc
+    if not 64 <= limit <= 2048:
+        raise RuntimeError("HF_MAX_TOKENS must be between 64 and 2048.")
+    return limit
+
+
 def embedding_model() -> str:
     provider = embedding_provider()
     if provider == "local":
@@ -440,7 +451,7 @@ def generate_answer(
         response = _huggingface_client().chat.completions.create(
             model=chat_model(),
             messages=messages,
-            max_tokens=650,
+            max_tokens=hf_max_tokens(),
             temperature=0.2,
         )
         answer = response.choices[0].message.content
@@ -473,13 +484,30 @@ def generate_answer_stream(
         return
 
     provider = llm_provider()
+    messages = _chat_messages(question, retrieved, history)
+
+    if provider == "huggingface":
+        response = _huggingface_client().chat.completions.create(
+            model=chat_model(),
+            messages=messages,
+            max_tokens=hf_max_tokens(),
+            temperature=0.2,
+            stream=True,
+        )
+        for chunk in response:
+            if not chunk.choices:
+                continue
+            content = chunk.choices[0].delta.content
+            if isinstance(content, str) and content:
+                yield content
+        return
+
     if provider != "ollama":
         yield generate_answer(question, retrieved, history)
         return
 
     import json
 
-    messages = _chat_messages(question, retrieved, history)
     with _ollama_request(messages, stream=True) as response:
         response.raise_for_status()
         for line in response.iter_lines():
