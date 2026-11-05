@@ -1,0 +1,29 @@
+[
+  {
+    "query_id": "dns-windows",
+    "answer": "Confira os resolvedores configurados e teste a consulta com nslookup [S1].",
+    "sources": [
+      {
+        "citation": "S1",
+        "source": "dns-resolution.md",
+        "chunk_index": 0
+      }
+    ]
+  },
+  {
+    "query_id": "gateway-but-no-sites",
+    "answer": "Verifique o gateway e a resolução de nomes; se o IP responde e o nome falha, investigue DNS [S1] [S2].",
+    "sources": [
+      {
+        "citation": "S1",
+        "source": "dns-resolution.md",
+        "chunk_index": 0
+      },
+      {
+        "citation": "S2",
+        "source": "network-gateway.md",
+        "chunk_index": 0
+      }
+    ]
+  }
+]
