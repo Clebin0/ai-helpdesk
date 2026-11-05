@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from rag_evaluation import evaluate_citation_answers, evaluate_retrieval
+from rag_evaluation import evaluate_abstention, evaluate_citation_answers, evaluate_retrieval
 
 
 def _percentile(values: list[float], percentile: float) -> float:
@@ -45,12 +45,24 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise SystemExit("O benchmark precisa conter documents e queries.")
 
     expected_names = {str(item.get("source", "")).strip() for item in documents}
+    query_ids: set[str] = set()
     for case in cases:
-        unknown = set(case.get("expected_sources", [])) - expected_names
+        query_id = str(case.get("id", "")).strip()
+        if not query_id or query_id in query_ids:
+            raise SystemExit(f"ID de pergunta ausente ou duplicado: {query_id!r}")
+        query_ids.add(query_id)
+        if not isinstance(case.get("answerable"), bool):
+            raise SystemExit(f"A pergunta {query_id} precisa definir answerable como boolean.")
+        expected_sources = set(case.get("expected_sources", []))
+        unknown = expected_sources - expected_names
         if unknown:
             raise SystemExit(
-                f"Fontes esperadas não existem no corpus ({case.get('id')}): {sorted(unknown)}"
+                f"Fontes esperadas não existem no corpus ({query_id}): {sorted(unknown)}"
             )
+        if case["answerable"] and not expected_sources:
+            raise SystemExit(f"A pergunta respondível {query_id} precisa de expected_sources.")
+        if not case["answerable"] and expected_sources:
+            raise SystemExit(f"A pergunta sem resposta {query_id} precisa de expected_sources vazio.")
 
     db_path = args.db_path.resolve()
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -85,7 +97,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     retrieved_by_query: dict[str, list[dict[str, Any]]] = {}
     query_latencies_ms: list[float] = []
     per_query_latency: list[dict[str, Any]] = []
-    candidate_limit = min(8, max(args.top_k, args.top_k * 2))
+    candidate_limit = args.top_k  # Match the live assistant's retrieval depth.
 
     for case in cases:
         samples: list[float] = []
@@ -111,11 +123,28 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             }
         )
 
+    answerable_cases = [case for case in cases if case["answerable"]]
     retrieval = evaluate_retrieval(
+        answerable_cases,
+        retrieved_by_query,
+        top_k=args.top_k,
+    )
+    answerability = evaluate_abstention(
         cases,
         retrieved_by_query,
         top_k=args.top_k,
     )
+    retrieval_by_type: dict[str, Any] = {}
+    for query_type in sorted({str(case.get("type", "canonical")) for case in answerable_cases}):
+        typed_cases = [
+            case for case in answerable_cases
+            if str(case.get("type", "canonical")) == query_type
+        ]
+        retrieval_by_type[query_type] = evaluate_retrieval(
+            typed_cases,
+            retrieved_by_query,
+            top_k=args.top_k,
+        )
     report: dict[str, Any] = {
         "benchmark": dataset.get("name", "RAG benchmark"),
         "dataset_version": dataset.get("version", 1),
@@ -138,8 +167,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "per_query": per_query_latency,
         },
         "retrieval": retrieval,
+        "retrieval_by_type": retrieval_by_type,
+        "answerability": answerability,
         "notes": [
-            "A avaliação mede recuperação de fontes, não qualidade semântica das respostas do LLM.",
+            "A avaliação de recuperação mede fontes esperadas apenas em perguntas respondíveis.",
+            "A abstenção é medida no retriever: zero trechos relevantes significa que o assistente segue o caminho sem contexto; o texto de recusa do LLM não é avaliado.",
             "O benchmark usa documentos e perguntas sintéticos, não dados de clientes ou da empresa.",
             "A latência mede consulta e embedding da pergunta após a indexação; não inclui download inicial do modelo.",
             "O benchmark usa um SQLite separado e não modifica a base de conhecimento padrão do assistente.",
