@@ -196,6 +196,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             }
         )
 
+    if lexical_index is not None:
+        lexical_index.close()
+
     answerable_cases = [case for case in cases if case["answerable"]]
     retrieval = evaluate_retrieval(
         answerable_cases,
@@ -385,6 +388,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--hybrid-semantic-rescue precisa ficar entre 0 e 1.")
     if args.rrf_rank_constant < 1:
         parser.error("--rrf-rank-constant precisa ser pelo menos 1.")
+    if not math.isfinite(args.rrf_bm25_cutoff):
+        parser.error("--rrf-bm25-cutoff precisa ser um número finito.")
     if not 1 <= args.rrf_candidate_depth <= 64:
         parser.error("--rrf-candidate-depth precisa ficar entre 1 e 64.")
     return args
