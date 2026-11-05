@@ -36,6 +36,10 @@ def tokenize(text: str) -> list[str]:
         "chaves": "chave",
         "suspeito": "suspeita",
         "suspeitos": "suspeita",
+        "trazer": "restaurar",
+        "volta": "restaurar",
+        "recuperar": "restaurar",
+        "restauracao": "restaurar",
     }
     return [
         token_forms.get(token, token)
