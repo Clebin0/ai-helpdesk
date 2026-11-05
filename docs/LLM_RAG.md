@@ -171,7 +171,15 @@ Para avaliar respostas capturadas do assistente, prepare um JSON com `query_id`,
 
 A auditoria mede se os identificadores [S1], [S2] etc. existem nos metadados retornados e se apontam para fontes esperadas pelo benchmark. Ela **não prova que o trecho citado sustenta semanticamente cada afirmação**. Essa verificação exige revisão humana ou um protocolo de avaliação semântica separado.
 
-O valor passado em `--min-relevance` vale apenas naquela execução. Compare Recall@K, Precision of returned, as métricas de abstenção e a quantidade de fontes retornadas; um corte alto demais pode remover uma fonte necessária. No benchmark v2, 0.18 retornou fontes indevidas para as cinco consultas sem resposta. A varredura encontrou 100% de abstenção com 0.55, mas o recall caiu para 53,1%. Isso mostra que o threshold sozinho não resolve o problema; 0.18 permanece como padrão de produção enquanto recuperação híbrida e reranking são avaliados.
+O valor passado em `--min-relevance` vale apenas naquela execução. Compare Recall@K, Precision of returned, as métricas de abstenção e a quantidade de fontes retornadas; um corte alto demais pode remover uma fonte necessária. No benchmark v2, o modo semântico com 0.18 retornou fontes para as cinco consultas sem resposta. Aumentar o threshold até 0.55 bloqueou todas, mas reduziu o recall para 53,1%.
+
+Existe um reranker lexical experimental, acionado apenas por `--retrieval-mode hybrid`:
+
+    python scripts/evaluate_rag.py --retrieval-mode hybrid --top-k 4 --repeats 3 --min-relevance 0.18
+
+Ele reordena os oito candidatos densos por score semântico (80%) e cobertura lexical IDF (20%), exige cobertura lexical mínima de 0.10 e mantém um caminho de resgate semântico em 0.55. No corpus v2, alcançou Recall@4 de 93,75%, Precision of returned de 91,67% e abstenção correta em 5/5 consultas sem fonte, contra 0/5 no modo semântico. Também recuperou pelo menos uma fonte esperada nas 16 perguntas respondíveis. É um resultado experimental em corpus sintético de oito documentos, não uma validação para produção. Esse módulo não faz busca lexical independente/BM25 e não é usado pelo endpoint de chat.
+
+O modo padrão do benchmark continua `semantic`, e `RAG_MIN_RELEVANCE=0.18` permanece inalterado na aplicação.
 
 O corpus e as perguntas são artificiais e servem para comparar alterações no retriever. Não representam chamados reais nem garantem desempenho em produção. Mantenha o mesmo corpus, modelo de embedding, K e configuração ao comparar execuções.
 
@@ -185,4 +193,4 @@ Mantenha a API em rede confiável. Antes de expor para terceiros, use HTTPS, con
 - Chunking baseado em caracteres, não tokens.
 - O limiar RAG_MIN_RELEVANCE exige avaliação com perguntas reais.
 - O histórico é limitado aos últimos oito turnos e existe apenas na sessão atual.
-- O benchmark é sintético e pequeno; faltam dados representativos autorizados, revisão semântica humana de citações, teste da recusa textual do LLM, recuperação híbrida e reranking. Não classifique o módulo como pronto para produção sem essas avaliações.
+- O benchmark é sintético e pequeno; faltam dados representativos autorizados, revisão semântica humana de citações, teste da recusa textual do LLM e busca lexical independente (BM25/FTS). O reranker lexical disponível permanece experimental e não está integrado ao chat. Não classifique o módulo como pronto para produção sem essas avaliações.
