@@ -1,7 +1,7 @@
 {
   "name": "AI Helpdesk RAG retrieval benchmark",
-  "version": 1,
-  "description": "Synthetic Portuguese IT-support queries and documents. No customer or company data.",
+  "version": 2,
+  "description": "Synthetic Portuguese IT-support corpus: canonical questions, paraphrases and unsupported requests. No customer or company data.",
   "documents": [
     {
       "source": "dns-resolution.md",
@@ -40,42 +40,193 @@
     {
       "id": "dns-windows",
       "question": "Como testar se o problema é DNS no Windows?",
-      "expected_sources": ["dns-resolution.md", "network-gateway.md"]
+      "expected_sources": [
+        "dns-resolution.md",
+        "network-gateway.md"
+      ],
+      "answerable": true,
+      "type": "canonical"
     },
     {
       "id": "gateway-but-no-sites",
       "question": "Consigo pingar o gateway mas os nomes dos sites não abrem. O que verificar?",
-      "expected_sources": ["dns-resolution.md", "network-gateway.md"]
+      "expected_sources": [
+        "dns-resolution.md",
+        "network-gateway.md"
+      ],
+      "answerable": true,
+      "type": "canonical"
     },
     {
       "id": "printer-stuck",
       "question": "A impressora tem documentos parados na fila e não imprime. Como investigar?",
-      "expected_sources": ["printer-queue.md"]
+      "expected_sources": [
+        "printer-queue.md"
+      ],
+      "answerable": true,
+      "type": "canonical"
     },
     {
       "id": "account-locked",
       "question": "Um usuário está bloqueado e não consegue acessar a aplicação. O que conferir?",
-      "expected_sources": ["account-access.md"]
+      "expected_sources": [
+        "account-access.md"
+      ],
+      "answerable": true,
+      "type": "canonical"
     },
     {
       "id": "phishing-email",
       "question": "Recebi um e-mail suspeito com link estranho. Qual é o procedimento inicial?",
-      "expected_sources": ["phishing-response.md"]
+      "expected_sources": [
+        "phishing-response.md"
+      ],
+      "answerable": true,
+      "type": "canonical"
     },
     {
       "id": "api-timeout",
       "question": "Um endpoint REST está demorando e encerrando por timeout. Quais evidências coletar?",
-      "expected_sources": ["api-timeout.md"]
+      "expected_sources": [
+        "api-timeout.md"
+      ],
+      "answerable": true,
+      "type": "canonical"
     },
     {
       "id": "restore-backup",
       "question": "Como recuperar arquivos de uma cópia de segurança com segurança?",
-      "expected_sources": ["backup-restore.md"]
+      "expected_sources": [
+        "backup-restore.md"
+      ],
+      "answerable": true,
+      "type": "canonical"
     },
     {
       "id": "disk-full",
       "question": "O notebook está ficando sem espaço no SSD. O que devo analisar?",
-      "expected_sources": ["disk-space.md"]
+      "expected_sources": [
+        "disk-space.md"
+      ],
+      "answerable": true,
+      "type": "canonical"
+    },
+    {
+      "id": "dns-paraphrase",
+      "question": "Meu Windows não encontra os sites pelo nome. Como descubro se é falha de DNS?",
+      "expected_sources": [
+        "dns-resolution.md",
+        "network-gateway.md"
+      ],
+      "answerable": true,
+      "type": "paraphrase",
+      "variant_of": "dns-windows"
+    },
+    {
+      "id": "gateway-paraphrase",
+      "question": "O ping para o roteador funciona, mas os domínios não carregam no navegador. O que devo testar?",
+      "expected_sources": [
+        "dns-resolution.md",
+        "network-gateway.md"
+      ],
+      "answerable": true,
+      "type": "paraphrase",
+      "variant_of": "gateway-but-no-sites"
+    },
+    {
+      "id": "printer-paraphrase",
+      "question": "Os trabalhos ficam pendurados e acumulados na impressora. Como investigar a fila?",
+      "expected_sources": [
+        "printer-queue.md"
+      ],
+      "answerable": true,
+      "type": "paraphrase",
+      "variant_of": "printer-stuck"
+    },
+    {
+      "id": "account-paraphrase",
+      "question": "Uma pessoa teve o login bloqueado e perdeu acesso ao sistema. Quais verificações são seguras?",
+      "expected_sources": [
+        "account-access.md"
+      ],
+      "answerable": true,
+      "type": "paraphrase",
+      "variant_of": "account-locked"
+    },
+    {
+      "id": "phishing-paraphrase",
+      "question": "Recebi uma mensagem que parece golpe por e-mail. Qual deve ser minha primeira ação?",
+      "expected_sources": [
+        "phishing-response.md"
+      ],
+      "answerable": true,
+      "type": "paraphrase",
+      "variant_of": "phishing-email"
+    },
+    {
+      "id": "api-paraphrase",
+      "question": "Uma chamada HTTP para minha API estoura o tempo limite. Quais informações devo levantar?",
+      "expected_sources": [
+        "api-timeout.md"
+      ],
+      "answerable": true,
+      "type": "paraphrase",
+      "variant_of": "api-timeout"
+    },
+    {
+      "id": "backup-paraphrase",
+      "question": "Preciso trazer um arquivo de volta usando um backup. Que cuidados devo tomar antes?",
+      "expected_sources": [
+        "backup-restore.md"
+      ],
+      "answerable": true,
+      "type": "paraphrase",
+      "variant_of": "restore-backup"
+    },
+    {
+      "id": "disk-paraphrase",
+      "question": "O armazenamento do notebook está no limite. Como investigar o consumo sem excluir arquivos?",
+      "expected_sources": [
+        "disk-space.md"
+      ],
+      "answerable": true,
+      "type": "paraphrase",
+      "variant_of": "disk-full"
+    },
+    {
+      "id": "vpn-wireguard-unsupported",
+      "question": "Como configurar um túnel VPN WireGuard no Ubuntu e gerar as chaves?",
+      "expected_sources": [],
+      "answerable": false,
+      "type": "unanswerable"
+    },
+    {
+      "id": "entra-conditional-access-unsupported",
+      "question": "Como criar uma política de acesso condicional no Microsoft Entra ID?",
+      "expected_sources": [],
+      "answerable": false,
+      "type": "unanswerable"
+    },
+    {
+      "id": "bios-update-unsupported",
+      "question": "Qual arquivo devo baixar para atualizar a BIOS desta placa-mãe?",
+      "expected_sources": [],
+      "answerable": false,
+      "type": "unanswerable"
+    },
+    {
+      "id": "cisco-vlan-unsupported",
+      "question": "Como configurar VLAN 802.1Q em um switch Cisco?",
+      "expected_sources": [],
+      "answerable": false,
+      "type": "unanswerable"
+    },
+    {
+      "id": "kubernetes-unsupported",
+      "question": "Qual comando devo usar para reiniciar somente um pod específico no Kubernetes?",
+      "expected_sources": [],
+      "answerable": false,
+      "type": "unanswerable"
     }
   ]
 }
