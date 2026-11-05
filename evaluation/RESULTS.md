@@ -104,6 +104,56 @@ python scripts/evaluate_rag.py --retrieval-mode hybrid --top-k 4 --repeats 3 --m
 
 O modo padrão continua sendo `semantic`. O modo `hybrid` só é ativado explicitamente no benchmark e não foi integrado ao caminho de chat.
 
+## Busca lexical independente (SQLite FTS5/BM25) + RRF — experimento v2
+
+O modo experimental --retrieval-mode rrf constrói um índice FTS5 isolado em memória a partir dos mesmos chunks do corpus. A busca lexical usa BM25 e é executada independentemente da busca vetorial. Depois de filtros de evidência, os dois rankings são combinados por Reciprocal Rank Fusion:
+
+RRF(d) = Σ [1 / (60 + posição do documento no ranking)]
+
+Configuração reproduzível desta execução:
+
+| Parâmetro | Valor |
+|---|---:|
+| Profundidade de cada ranking | 8 |
+| Constante RRF | 60 |
+| Corte BM25 (aceita score ≤ valor) | -2,5 |
+| Peso semântico no filtro vetorial | 0,80 |
+| Cobertura lexical IDF mínima do filtro vetorial | 0,10 |
+| Resgate semântico no filtro vetorial | 0,55 |
+| RAG_MIN_RELEVANCE dos candidatos vetoriais | 0,18 |
+| K final | 4 |
+| Repetições de latência | 3 |
+
+O filtro BM25 é importante: a busca OR do FTS5 sempre pode encontrar termos isolados em documentos que não respondem à pergunta. O corte -2,5 foi calibrado apenas neste corpus sintético. Scores BM25 dependem do conjunto indexado e não devem ser reutilizados como limiar universal. A lista vetorial também passa pelo filtro híbrido já medido; só então os rankings aprovados são fundidos.
+
+### Comparação dos três modos
+
+| Métrica | Semântico | Reranker lexical | FTS5/BM25 + RRF |
+|---|---:|---:|---:|
+| Recall@4 | 100% | 93,75% | 93,75% |
+| Precision of returned | 38,02% | 91,67% | 91,67% |
+| Fontes por pergunta | 3,62 | 1,38 | 1,38 |
+| MRR | 100% | 100% | 96,88% |
+| Hit Rate@4 | 100% | 100% | 100% |
+| Perguntas respondíveis com fonte esperada | 16/16 | 16/16 | 16/16 |
+| Abstenções corretas | 0/5 | 5/5 | 5/5 |
+| Recuperações indevidas fora do escopo | 5/5 | 0/5 | 0/5 |
+| F1 de abstenção | 0% | 100% | 100% |
+| Latência média | 8,541 ms | 9,462 ms | 9,223 ms |
+| Latência p95 | 11,012 ms | 12,117 ms | 10,574 ms |
+
+O índice FTS5 levou 0,001 s para ser criado neste corpus de oito documentos. Esse tempo não é uma estimativa de desempenho em bases maiores.
+
+**Interpretação:** o RRF confirma que a busca independente BM25 pode ser combinada com o ranking vetorial e mantém as cinco abstenções corretas. Neste benchmark, porém, ele não superou o reranker lexical anterior: recall, precisão entre fontes retornadas e quantidade média de fontes ficaram iguais, enquanto o MRR caiu de 100% para 96,88%. Portanto, ele é uma alternativa experimental válida, mas não substitui o reranker como melhor resultado medido neste conjunto.
+
+Reproduza com:
+
+~~~powershell
+python scripts/evaluate_rag.py --retrieval-mode rrf --top-k 4 --repeats 3 --min-relevance 0.18 --rrf-bm25-cutoff -2.5
+~~~
+
+O modo padrão continua sendo semantic. Os modos hybrid e rrf só são ativados explicitamente no benchmark e não foram integrados ao caminho de chat.
+
 **Configuração de produção preservada:** `RAG_MIN_RELEVANCE=0.18`. Nenhum valor do arquivo .env ou do padrão de produção foi alterado. Os resultados são experimentais e não justificam uma alteração automática.
 
 ## Auditoria anterior de citações
