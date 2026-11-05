@@ -157,9 +157,10 @@ def test_committed_benchmark_dataset_has_valid_expected_sources():
     sources = {document["source"] for document in dataset["documents"]}
 
     assert len(dataset["documents"]) == 8
-    assert len(dataset["queries"]) == 8
+    assert len(dataset["queries"]) == 21
     assert len({query["id"] for query in dataset["queries"]}) == len(dataset["queries"])
-    assert all(query["expected_sources"] for query in dataset["queries"])
+    assert all(query["answerable"] is True and query["expected_sources"] for query in dataset["queries"] if query["answerable"])
+    assert all(query["answerable"] is False and not query["expected_sources"] for query in dataset["queries"] if not query["answerable"])
     assert all(set(query["expected_sources"]) <= sources for query in dataset["queries"])
     assert all(len(document["content"]) <= 500 for document in dataset["documents"])
 
@@ -185,7 +186,7 @@ def test_abstention_metrics_distinguish_correct_abstention_from_missed_answers()
     assert result["missed_answerable_queries"] == 0
     assert result["false_answers_on_unsupported_queries"] == 1
     assert result["answered_without_expected_evidence"] == 1
-    assert result["answerability_accuracy"] == 0.5
+    assert result["answerability_accuracy"] == 0.75
     assert result["abstention_precision"] == 1.0
     assert result["abstention_recall"] == 0.5
     assert result["abstention_f1"] == pytest.approx(2/3)
