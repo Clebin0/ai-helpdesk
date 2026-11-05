@@ -36,15 +36,12 @@ def _authorize(provided: str | None, variable: str) -> None:
         raise HTTPException(status_code=401, detail="Invalid or missing access token.")
 
 
-
-
 def _provider_rate_limit_error(exc: Exception) -> HTTPException | None:
-    if getattr(exc, "status_code", None) != 429:
-        return None
-
+    status = getattr(exc, "status_code", None)
     error_code = getattr(exc, "code", None)
     error_type = getattr(exc, "type", None)
     response = getattr(exc, "response", None)
+
     if response is not None:
         try:
             payload = response.json()
@@ -55,40 +52,58 @@ def _provider_rate_limit_error(exc: Exception) -> HTTPException | None:
         except Exception:
             pass
 
-    if error_code in {
+    quota_codes = {
         "credit_balance_exhausted",
         "insufficient_quota",
         "organization_spend_limit_exceeded",
         "project_spend_limit_exceeded",
         "organization_usage_limit_exceeded",
-    } or error_type == "insufficient_quota":
+    }
+    if status == 402 or error_code in quota_codes or error_type == "insufficient_quota":
         return HTTPException(
             status_code=402,
             detail=(
-                "A conta da OpenAI está sem créditos disponíveis ou atingiu um limite "
-                "de gastos/uso. Verifique o saldo e os limites na plataforma antes de "
-                "tentar novamente."
+                "A cota de inferência da Hugging Face foi esgotada ou a conta não tem "
+                "créditos disponíveis. O plano gratuito inclui uma pequena cota mensal; "
+                "o aplicativo não compra créditos nem habilita cobrança adicional."
             ),
         )
 
-    return HTTPException(
-        status_code=429,
-        detail=(
-            "A OpenAI limitou temporariamente as solicitações. Aguarde antes de tentar "
-            "novamente e reduza a frequência das chamadas."
-        ),
-    )
+    if status == 429:
+        return HTTPException(
+            status_code=429,
+            detail=(
+                "O provedor limitou temporariamente as solicitações. Aguarde e tente "
+                "novamente; evite repetir chamadas em sequência."
+            ),
+        )
+
+    if status in {401, 403}:
+        return HTTPException(
+            status_code=503,
+            detail=(
+                "A autenticação da Hugging Face falhou ou o token não tem permissão "
+                "Inference Providers. Revise HF_TOKEN e as permissões do token."
+            ),
+        )
+
+    return None
 
 
 @router.get("/health")
 def assistant_health():
     return {
         "status": "ready",
+        "llm_provider": assistant_core.llm_provider(),
+        "chat_model": assistant_core.chat_model(),
+        "hf_token_configured": bool(
+            os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+        ),
         "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "embedding_provider": assistant_core.embedding_provider(),
+        "embedding_model": assistant_core.embedding_model(),
         "chat_access_configured": bool(os.getenv("ASSISTANT_ACCESS_TOKEN")),
         "ingestion_access_configured": bool(os.getenv("ASSISTANT_ADMIN_TOKEN")),
-        "chat_model": assistant_core.chat_model(),
-        "embedding_model": assistant_core.embedding_model(),
     }
 
 
@@ -112,11 +127,9 @@ def assistant_ingest(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
-        # Surface actionable quota/rate-limit states without leaking provider payloads.
         provider_error = _provider_rate_limit_error(exc)
         if provider_error is not None:
             raise provider_error from exc
-        # Avoid returning provider messages, request IDs or secrets to API clients.
         raise HTTPException(
             status_code=502,
             detail="Document indexing failed. Check server logs and provider configuration.",
@@ -134,7 +147,6 @@ def assistant_chat(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
-        # Surface actionable quota/rate-limit states without leaking provider payloads.
         provider_error = _provider_rate_limit_error(exc)
         if provider_error is not None:
             raise provider_error from exc

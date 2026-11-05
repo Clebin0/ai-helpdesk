@@ -27,6 +27,9 @@ def deterministic_embeddings(texts: list[str]) -> list[list[float]]:
 def configure_test_environment(monkeypatch, tmp_path):
     monkeypatch.setenv("RAG_DB_PATH", str(tmp_path / "assistant.sqlite3"))
     monkeypatch.setenv("OPENAI_API_KEY", "test-key-not-real")
+    monkeypatch.setenv("HF_TOKEN", "hf_test_not_real")
+    monkeypatch.setenv("LLM_PROVIDER", "huggingface")
+    monkeypatch.setenv("RAG_EMBEDDING_PROVIDER", "local")
     monkeypatch.setenv("ASSISTANT_ADMIN_TOKEN", "test-admin-token")
     monkeypatch.setenv("ASSISTANT_ACCESS_TOKEN", "test-chat-token")
     monkeypatch.setattr(assistant_core, "embed_texts", deterministic_embeddings)
@@ -45,6 +48,17 @@ def test_cosine_similarity_handles_zero_and_mismatched_vectors():
     assert math.isclose(
         assistant_core._cosine_similarity([1.0, 0.0], [1.0, 0.0]), 1.0
     )
+
+
+def test_embedding_model_namespaces_local_and_openai(monkeypatch):
+    monkeypatch.setenv("RAG_EMBEDDING_PROVIDER", "local")
+    monkeypatch.setenv(
+        "LOCAL_EMBEDDING_MODEL",
+        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    )
+    assert assistant_core.embedding_model().startswith("fastembed:")
+    monkeypatch.setenv("RAG_EMBEDDING_PROVIDER", "openai")
+    assert assistant_core.embedding_model() == "openai:text-embedding-3-small"
 
 
 def test_ingestion_is_idempotent_for_same_source(monkeypatch, tmp_path):
@@ -126,11 +140,15 @@ def test_api_ingest_and_chat_return_cited_sources(monkeypatch, tmp_path):
 
 
 def test_health_does_not_expose_credentials(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "super-secret-key")
+    monkeypatch.setenv("HF_TOKEN", "hf-super-secret-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-super-secret-key")
     response = client.get("/assistant/health")
     assert response.status_code == 200
-    assert "super-secret-key" not in response.text
-    assert response.json()["openai_configured"] is True
+    assert "hf-super-secret-key" not in response.text
+    assert "openai-super-secret-key" not in response.text
+    assert response.json()["llm_provider"] == "huggingface"
+    assert response.json()["hf_token_configured"] is True
+    assert response.json()["embedding_provider"] == "local"
 
 
 def test_api_rejects_extra_fields():
@@ -157,7 +175,7 @@ class FakeProviderQuotaError(Exception):
     response = FakeProviderResponse()
 
 
-def test_ingest_reports_exhausted_openai_credits(monkeypatch, tmp_path):
+def test_ingest_reports_exhausted_provider_credits(monkeypatch, tmp_path):
     configure_test_environment(monkeypatch, tmp_path)
 
     def fail_ingestion(source, content):
@@ -173,10 +191,10 @@ def test_ingest_reports_exhausted_openai_credits(monkeypatch, tmp_path):
         },
     )
     assert response.status_code == 402
-    assert "sem créditos disponíveis" in response.json()["detail"]
+    assert "cota de inferência" in response.json()["detail"]
 
 
-def test_chat_reports_exhausted_openai_credits(monkeypatch, tmp_path):
+def test_chat_reports_exhausted_provider_credits(monkeypatch, tmp_path):
     configure_test_environment(monkeypatch, tmp_path)
 
     def fail_answer(question, top_k=4):
@@ -189,4 +207,42 @@ def test_chat_reports_exhausted_openai_credits(monkeypatch, tmp_path):
         json={"question": "Como diagnosticar DNS?"},
     )
     assert response.status_code == 402
-    assert "sem créditos disponíveis" in response.json()["detail"]
+    assert "cota de inferência" in response.json()["detail"]
+
+
+def test_huggingface_chat_uses_openai_compatible_router(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "huggingface")
+    monkeypatch.setenv("HF_CHAT_MODEL", "test/model")
+
+    class FakeMessage:
+        content = "Confirme o resolvedor DNS [S1]."
+
+    class FakeChoice:
+        message = FakeMessage()
+
+    class FakeResponse:
+        choices = [FakeChoice()]
+
+    class FakeCompletions:
+        def __init__(self):
+            self.call = None
+
+        def create(self, **kwargs):
+            self.call = kwargs
+            return FakeResponse()
+
+    completions = FakeCompletions()
+
+    class FakeClient:
+        chat = type("Chat", (), {"completions": completions})()
+
+    monkeypatch.setattr(assistant_core, "_huggingface_client", lambda: FakeClient())
+    answer = assistant_core.generate_answer(
+        "Como testar DNS?",
+        [{"source": "dns.md", "chunk_index": 0, "content": "Teste o resolvedor DNS."}],
+    )
+
+    assert answer == "Confirme o resolvedor DNS [S1]."
+    assert completions.call["model"] == "test/model"
+    assert completions.call["max_tokens"] == 650
+    assert completions.call["messages"][0]["role"] == "system"

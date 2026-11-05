@@ -5,36 +5,106 @@ import json
 import math
 import os
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-DEFAULT_CHAT_MODEL = "gpt-6-luna"
-DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
-CHUNK_SIZE = 2400
-CHUNK_OVERLAP = 250
+DEFAULT_HF_CHAT_MODEL = "Qwen/Qwen3.5-9B:cheapest"
+DEFAULT_LOCAL_EMBEDDING_MODEL = (
+    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+)
+DEFAULT_OPENAI_CHAT_MODEL = "gpt-6-luna"
+DEFAULT_OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"
+CHUNK_SIZE = 500
+CHUNK_OVERLAP = 80
 EMBEDDING_BATCH_SIZE = 32
+
+_embedding_models: dict[str, Any] = {}
+_embedding_model_lock = threading.Lock()
+
+
+def llm_provider() -> str:
+    return os.getenv("LLM_PROVIDER", "huggingface").strip().lower()
+
+
+def embedding_provider() -> str:
+    return os.getenv("RAG_EMBEDDING_PROVIDER", "local").strip().lower()
+
+
+def local_embedding_model() -> str:
+    return os.getenv("LOCAL_EMBEDDING_MODEL", DEFAULT_LOCAL_EMBEDDING_MODEL).strip()
 
 
 def chat_model() -> str:
-    return os.getenv("OPENAI_CHAT_MODEL", DEFAULT_CHAT_MODEL)
+    provider = llm_provider()
+    if provider == "huggingface":
+        return os.getenv("HF_CHAT_MODEL", DEFAULT_HF_CHAT_MODEL).strip()
+    if provider == "openai":
+        return os.getenv("OPENAI_CHAT_MODEL", DEFAULT_OPENAI_CHAT_MODEL).strip()
+    raise RuntimeError("LLM_PROVIDER must be 'huggingface' or 'openai'.")
 
 
 def embedding_model() -> str:
-    return os.getenv("OPENAI_EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+    provider = embedding_provider()
+    if provider == "local":
+        return f"fastembed:{local_embedding_model()}"
+    if provider == "openai":
+        return (
+            "openai:"
+            + os.getenv("OPENAI_EMBEDDING_MODEL", DEFAULT_OPENAI_EMBEDDING_MODEL)
+        )
+    raise RuntimeError("RAG_EMBEDDING_PROVIDER must be 'local' or 'openai'.")
 
 
 def database_path() -> Path:
     return Path(os.getenv("RAG_DB_PATH", "data/assistant.sqlite3"))
 
 
-def _client():
+def _openai_client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured.")
     from openai import OpenAI
 
-    return OpenAI(api_key=api_key, timeout=45.0, max_retries=2)
+    return OpenAI(api_key=api_key, timeout=45.0, max_retries=0)
+
+
+def _huggingface_client():
+    token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+    if not token:
+        raise RuntimeError(
+            "HF_TOKEN is not configured. Create a Hugging Face token with "
+            "Inference Providers permission and add it to .env."
+        )
+    from openai import OpenAI
+
+    return OpenAI(
+        base_url="https://router.huggingface.co/v1",
+        api_key=token,
+        timeout=60.0,
+        max_retries=0,
+    )
+
+
+def _local_embedding_engine():
+    model_name = local_embedding_model()
+    if not model_name:
+        raise RuntimeError("LOCAL_EMBEDDING_MODEL cannot be empty.")
+    if model_name not in _embedding_models:
+        with _embedding_model_lock:
+            if model_name not in _embedding_models:
+                try:
+                    from fastembed import TextEmbedding
+                except ImportError as exc:
+                    raise RuntimeError(
+                        "FastEmbed is not installed. Run: "
+                        "python -m pip install -r requirements.txt"
+                    ) from exc
+                _embedding_models[model_name] = TextEmbedding(
+                    model_name=model_name
+                )
+    return _embedding_models[model_name]
 
 
 def chunk_text(text: str) -> list[str]:
@@ -91,13 +161,27 @@ def _connect(path: Path | None = None) -> sqlite3.Connection:
 def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
-    response = _client().embeddings.create(
-        model=embedding_model(),
-        input=texts,
-        encoding_format="float",
-    )
-    ordered = sorted(response.data, key=lambda item: item.index)
-    return [[float(value) for value in item.embedding] for item in ordered]
+
+    provider = embedding_provider()
+    if provider == "local":
+        engine = _local_embedding_engine()
+        return [
+            [float(value) for value in vector.tolist()]
+            for vector in engine.embed(texts)
+        ]
+
+    if provider == "openai":
+        response = _openai_client().embeddings.create(
+            model=os.getenv(
+                "OPENAI_EMBEDDING_MODEL", DEFAULT_OPENAI_EMBEDDING_MODEL
+            ),
+            input=texts,
+            encoding_format="float",
+        )
+        ordered = sorted(response.data, key=lambda item: item.index)
+        return [[float(value) for value in item.embedding] for item in ordered]
+
+    raise RuntimeError("RAG_EMBEDDING_PROVIDER must be 'local' or 'openai'.")
 
 
 def ingest_document(source: str, content: str) -> dict[str, Any]:
@@ -256,13 +340,30 @@ def generate_answer(question: str, retrieved: list[dict[str, Any]]) -> str:
         "Responda apenas com o que o contexto sustenta. Quando apropriado, organize em passos "
         "de diagnóstico e destaque quando for necessária validação humana."
     )
-    response = _client().responses.create(
-        model=chat_model(),
-        instructions=instructions,
-        input=prompt,
-        max_output_tokens=900,
-    )
-    answer = getattr(response, "output_text", None)
+
+    provider = llm_provider()
+    if provider == "huggingface":
+        response = _huggingface_client().chat.completions.create(
+            model=chat_model(),
+            messages=[
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=650,
+            temperature=0.2,
+        )
+        answer = response.choices[0].message.content
+    elif provider == "openai":
+        response = _openai_client().responses.create(
+            model=chat_model(),
+            instructions=instructions,
+            input=prompt,
+            max_output_tokens=900,
+        )
+        answer = getattr(response, "output_text", None)
+    else:
+        raise RuntimeError("LLM_PROVIDER must be 'huggingface' or 'openai'.")
+
     if not isinstance(answer, str) or not answer.strip():
         raise RuntimeError("The model returned an empty response.")
     return answer.strip()
