@@ -12,6 +12,10 @@ def test_tokenize_normalizes_accents_and_hyphenated_technical_terms():
     assert tokenize("Recebi link e anexos suspeitos em vários sites") == [
         "recebi", "link", "anexo", "suspeita", "varios", "site"
     ]
+    assert "restaurar" in tokenize(
+        "Preciso trazer um arquivo de volta usando um backup"
+    )
+    assert "restaurar" in tokenize("Restauração de backup")
 
 
 def test_hybrid_reranker_prefers_lexically_supported_candidate():
