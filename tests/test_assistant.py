@@ -214,6 +214,7 @@ def test_chat_reports_exhausted_provider_credits(monkeypatch, tmp_path):
 def test_huggingface_chat_uses_openai_compatible_router(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "huggingface")
     monkeypatch.setenv("HF_CHAT_MODEL", "test/model")
+    monkeypatch.setenv("HF_MAX_TOKENS", "128")
 
     class FakeMessage:
         content = "Confirme o resolvedor DNS [S1]."
@@ -245,12 +246,61 @@ def test_huggingface_chat_uses_openai_compatible_router(monkeypatch):
 
     assert answer == "Confirme o resolvedor DNS [S1]."
     assert completions.call["model"] == "test/model"
-    assert completions.call["max_tokens"] == 650
+    assert completions.call["max_tokens"] == 128
     assert completions.call["messages"][0]["role"] == "system"
 
 
 
 
+
+def test_huggingface_stream_yields_incremental_chunks(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "huggingface")
+    monkeypatch.setenv("HF_CHAT_MODEL", "test/model")
+    monkeypatch.setenv("HF_MAX_TOKENS", "160")
+    captured = {}
+
+    class FakeDelta:
+        def __init__(self, content):
+            self.content = content
+
+    class FakeChoice:
+        def __init__(self, content):
+            self.delta = FakeDelta(content)
+
+    class FakeChunk:
+        def __init__(self, content):
+            self.choices = [FakeChoice(content)]
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return iter([FakeChunk("Primeiro "), FakeChunk("segundo.")])
+
+    class FakeClient:
+        chat = type("Chat", (), {"completions": FakeCompletions()})()
+
+    monkeypatch.setattr(assistant_core, "_huggingface_client", lambda: FakeClient())
+    chunks = list(
+        assistant_core.generate_answer_stream(
+            "Como testar DNS?",
+            [{"source": "dns.md", "chunk_index": 0, "content": "Execute nslookup."}],
+        )
+    )
+
+    assert chunks == ["Primeiro ", "segundo."]
+    assert captured["stream"] is True
+    assert captured["max_tokens"] == 160
+    assert captured["model"] == "test/model"
+
+
+def test_hf_max_tokens_rejects_out_of_range_values(monkeypatch):
+    monkeypatch.setenv("HF_MAX_TOKENS", "20")
+    try:
+        assistant_core.hf_max_tokens()
+    except RuntimeError as exc:
+        assert "between 64 and 2048" in str(exc)
+    else:
+        raise AssertionError("Expected invalid HF_MAX_TOKENS to be rejected.")
 
 
 def test_ollama_payload_disables_thinking_and_keeps_model_warm(monkeypatch):
