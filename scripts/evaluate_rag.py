@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from hybrid_retrieval import rerank_hybrid
 from rag_evaluation import evaluate_abstention, evaluate_citation_answers, evaluate_retrieval
 
 
@@ -97,19 +98,35 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     retrieved_by_query: dict[str, list[dict[str, Any]]] = {}
     query_latencies_ms: list[float] = []
     per_query_latency: list[dict[str, Any]] = []
-    candidate_limit = args.top_k  # Match the live assistant's retrieval depth.
+    minimum_score = float(os.getenv("RAG_MIN_RELEVANCE", "0.18"))
 
     for case in cases:
         samples: list[float] = []
         retrieved: list[dict[str, Any]] = []
         for _ in range(args.repeats):
             started = time.perf_counter()
-            # Evaluate the same relevance threshold used by the live assistant,
-            # not the raw unfiltered nearest-neighbour list.
-            retrieved = assistant_core.relevant_chunks(
-                str(case["question"]),
-                top_k=candidate_limit,
-            )
+            # Semantic mode reproduces the live assistant. Hybrid mode reranks
+            # up to eight dense candidates with lexical query coverage.
+            if args.retrieval_mode == "semantic":
+                retrieved = assistant_core.relevant_chunks(
+                    str(case["question"]),
+                    top_k=args.top_k,
+                )
+            else:
+                candidates = assistant_core.retrieve_chunks(
+                    str(case["question"]),
+                    top_k=8,
+                )
+                ranked = rerank_hybrid(
+                    str(case["question"]),
+                    candidates,
+                    semantic_weight=args.hybrid_semantic_weight,
+                    minimum_lexical_coverage=args.hybrid_min_lexical_coverage,
+                    semantic_rescue_threshold=args.hybrid_semantic_rescue,
+                )
+                retrieved = [
+                    item for item in ranked if item["score"] >= minimum_score
+                ][: args.top_k]
             samples.append((time.perf_counter() - started) * 1000)
 
         retrieved_by_query[str(case["id"])] = retrieved
@@ -154,6 +171,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "llm_calls": 0,
         "top_k": args.top_k,
         "repeats": args.repeats,
+        "retrieval_mode": args.retrieval_mode,
+        "hybrid_parameters": (
+            {
+                "semantic_weight": args.hybrid_semantic_weight,
+                "lexical_weight": round(1 - args.hybrid_semantic_weight, 4),
+                "minimum_lexical_coverage": args.hybrid_min_lexical_coverage,
+                "semantic_rescue_threshold": args.hybrid_semantic_rescue,
+            }
+            if args.retrieval_mode == "hybrid" else None
+        ),
         "retrieval_min_relevance": float(os.getenv("RAG_MIN_RELEVANCE", "0.18")),
         "document_count": len(documents),
         "query_count": len(cases),
@@ -219,6 +246,30 @@ def parse_args() -> argparse.Namespace:
         help="Sobrescreve RAG_MIN_RELEVANCE apenas durante esta execução (0 a 1).",
     )
     parser.add_argument(
+        "--retrieval-mode",
+        choices=("semantic", "hybrid"),
+        default="semantic",
+        help="semantic reproduz o retriever atual; hybrid ativa o reranker lexical experimental.",
+    )
+    parser.add_argument(
+        "--hybrid-semantic-weight",
+        type=float,
+        default=0.55,
+        help="Peso do score vetorial no reranking híbrido (0 a 1).",
+    )
+    parser.add_argument(
+        "--hybrid-min-lexical-coverage",
+        type=float,
+        default=0.25,
+        help="Cobertura lexical IDF mínima para aceitar um candidato (0 a 1).",
+    )
+    parser.add_argument(
+        "--hybrid-semantic-rescue",
+        type=float,
+        default=0.60,
+        help="Score vetorial mínimo para aceitar paráfrase com baixa cobertura lexical (0 a 1).",
+    )
+    parser.add_argument(
         "--answers",
         type=Path,
         help="JSON opcional com respostas reais e metadados de fontes para auditar citações.",
@@ -235,6 +286,12 @@ def parse_args() -> argparse.Namespace:
         parser.error("--repeats precisa ficar entre 1 e 20.")
     if args.min_relevance is not None and not 0 <= args.min_relevance <= 1:
         parser.error("--min-relevance precisa ficar entre 0 e 1.")
+    if not 0 <= args.hybrid_semantic_weight <= 1:
+        parser.error("--hybrid-semantic-weight precisa ficar entre 0 e 1.")
+    if not 0 <= args.hybrid_min_lexical_coverage <= 1:
+        parser.error("--hybrid-min-lexical-coverage precisa ficar entre 0 e 1.")
+    if not 0 <= args.hybrid_semantic_rescue <= 1:
+        parser.error("--hybrid-semantic-rescue precisa ficar entre 0 e 1.")
     return args
 
 
