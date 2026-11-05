@@ -191,7 +191,7 @@ def test_abstention_metrics_distinguish_correct_abstention_from_missed_answers()
     assert result["abstention_recall"] == 0.5
     assert result["abstention_f1"] == pytest.approx(0.6667)
     assert result["answerable_retrieval_coverage"] == 0.5
-    assert result["evidence_precision_among_answered_queries"] == pytest.approx(1/3)
+    assert result["evidence_precision_among_answered_queries"] == pytest.approx(0.3333)
 
 
 def test_abstention_rejects_invalid_labels_and_empty_gold_sets():
