@@ -75,3 +75,12 @@ Authentication is required for chat and ingestion. If the corresponding token is
 - No conversation memory, hybrid search, reranker, streaming or agent tool execution yet.
 - There is no automatic action execution. The assistant only retrieves and explains approved documents.
 - Add offline evals for retrieval precision/recall, citation correctness, abstention quality, latency and token cost before claiming production readiness.
+
+
+## Erros de consumo da API
+
+- **HTTP 402:** a conta da OpenAI está sem créditos ou atingiu um limite de gastos/uso. Verifique saldo e limites no painel de cobrança antes de repetir.
+- **HTTP 429:** limite temporário de solicitações ou tokens. Aguarde o período indicado pela API e evite novas tentativas em loop.
+- **HTTP 502:** falha de comunicação ou erro não classificado do provedor. Consulte os logs locais sem compartilhar chaves ou tokens.
+
+Os erros são apresentados sem expor a chave de API ou o conteúdo interno da resposta do provedor.
