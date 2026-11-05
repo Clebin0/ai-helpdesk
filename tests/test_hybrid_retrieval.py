@@ -9,6 +9,9 @@ def test_tokenize_normalizes_accents_and_hyphenated_technical_terms():
     assert tokenize("Falha de e-mail e Wi-Fi na conexão") == [
         "falha", "email", "wifi", "conexao"
     ]
+    assert tokenize("Recebi link e anexos suspeitos em vários sites") == [
+        "recebi", "link", "anexo", "suspeita", "varios", "site"
+    ]
 
 
 def test_hybrid_reranker_prefers_lexically_supported_candidate():
