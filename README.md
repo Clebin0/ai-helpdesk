@@ -74,7 +74,7 @@ Exemplo de entrada:
 
 ## Avaliação do RAG
 
-O módulo RAG possui um benchmark local com documentos e perguntas sintéticos em português. Ele mede Recall@K, Precision@K, MRR, Hit Rate@K e latência do retriever usando embeddings locais, sem chamadas ao LLM:
+O módulo RAG possui um benchmark local com documentos e perguntas sintéticos em português. Ele mede Recall@K, Precision@K, MRR, Hit Rate@K, latência, recuperação de paráfrases e abstenção em consultas sem fonte. O benchmark usa embeddings locais e não chama o LLM:
 
 ```bash
 python scripts/evaluate_rag.py --top-k 4 --repeats 3
@@ -82,7 +82,7 @@ python scripts/evaluate_rag.py --top-k 4 --repeats 3
 python scripts/evaluate_rag.py --top-k 4 --repeats 3 --min-relevance 0.32
 ```
 
-Para auditar citações de respostas capturadas, use o formato de `evaluation/answers.example.json` e passe o arquivo com `--answers`. A auditoria verifica integridade dos IDs e alinhamento com fontes esperadas; não substitui avaliação humana de suporte semântico.
+Para auditar citações de respostas capturadas, use o formato de `evaluation/answers.example.json` e passe o arquivo com `--answers`. A auditoria verifica integridade dos IDs e alinhamento com fontes esperadas; não substitui avaliação humana de suporte semântico. A avaliação v2 também mede a abstenção do retriever, não a qualidade textual da recusa do LLM.
 
 Veja [docs/LLM_RAG.md](docs/LLM_RAG.md) para métricas, limitações e detalhes de execução. Os resultados medidos localmente estão em [evaluation/RESULTS.md](evaluation/RESULTS.md).
 
