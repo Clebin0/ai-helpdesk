@@ -97,6 +97,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     indexing_seconds = time.perf_counter() - index_started
 
     lexical_index: FTS5Index | None = None
+    lexical_indexing_seconds = 0.0
     if args.retrieval_mode == "rrf":
         lexical_chunks: list[dict[str, Any]] = []
         for document in documents:
@@ -110,10 +111,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                         "content": content,
                     }
                 )
+        lexical_started = time.perf_counter()
         try:
             lexical_index = FTS5Index(lexical_chunks)
         except RuntimeError as exc:
             raise SystemExit(str(exc)) from exc
+        lexical_indexing_seconds = time.perf_counter() - lexical_started
 
     retrieved_by_query: dict[str, list[dict[str, Any]]] = {}
     query_latencies_ms: list[float] = []
@@ -150,18 +153,31 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             else:
                 if lexical_index is None:
                     raise RuntimeError("FTS5 index was not initialized for RRF mode.")
+                dense_candidates = assistant_core.retrieve_chunks(
+                    str(case["question"]),
+                    top_k=args.rrf_candidate_depth,
+                )
+                # Use the tuned experimental hybrid gate on dense candidates,
+                # so RRF does not force weak nearest-neighbours into the context.
                 vector_candidates = [
                     item
-                    for item in assistant_core.retrieve_chunks(
+                    for item in rerank_hybrid(
                         str(case["question"]),
-                        top_k=args.rrf_candidate_depth,
+                        dense_candidates,
+                        semantic_weight=args.hybrid_semantic_weight,
+                        minimum_lexical_coverage=args.hybrid_min_lexical_coverage,
+                        semantic_rescue_threshold=args.hybrid_semantic_rescue,
                     )
                     if item["score"] >= minimum_score
                 ]
-                lexical_candidates = lexical_index.search(
-                    str(case["question"]),
-                    limit=args.rrf_candidate_depth,
-                )
+                lexical_candidates = [
+                    item
+                    for item in lexical_index.search(
+                        str(case["question"]),
+                        limit=args.rrf_candidate_depth,
+                    )
+                    if item["bm25_score"] <= args.rrf_bm25_cutoff
+                ]
                 retrieved = reciprocal_rank_fusion(
                     [vector_candidates, lexical_candidates],
                     rank_constant=args.rrf_rank_constant,
@@ -227,7 +243,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "vector_candidate_depth": args.rrf_candidate_depth,
                 "lexical_candidate_depth": args.rrf_candidate_depth,
                 "fusion": "SQLite FTS5/BM25 + dense cosine",
-                "score_filter": "vector candidates only, before RRF",
+                "bm25_cutoff": args.rrf_bm25_cutoff,
+                "vector_candidate_gate": {
+                    "semantic_weight": args.hybrid_semantic_weight,
+                    "minimum_lexical_coverage": args.hybrid_min_lexical_coverage,
+                    "semantic_rescue_threshold": args.hybrid_semantic_rescue,
+                },
+                "score_filter": "hybrid vector gate and BM25 cutoff, before RRF",
             }
             if args.retrieval_mode == "rrf" else None
         ),
@@ -236,6 +258,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "query_count": len(cases),
         "database_path": str(db_path),
         "indexing_seconds": round(indexing_seconds, 3),
+        "lexical_indexing_seconds": round(lexical_indexing_seconds, 3),
         "latency_ms": {
             "mean": round(statistics.mean(query_latencies_ms), 3),
             "median": round(statistics.median(query_latencies_ms), 3),
@@ -324,6 +347,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=60,
         help="Constante k da fusão RRF (score = 1 / (k + posição)).",
+    )
+    parser.add_argument(
+        "--rrf-bm25-cutoff",
+        type=float,
+        default=-2.5,
+        help="Aceita candidatos FTS5 apenas quando bm25 <= cutoff (mais negativo é melhor).",
     )
     parser.add_argument(
         "--rrf-candidate-depth",
