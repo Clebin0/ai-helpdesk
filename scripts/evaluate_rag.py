@@ -89,7 +89,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         retrieved: list[dict[str, Any]] = []
         for _ in range(args.repeats):
             started = time.perf_counter()
-            retrieved = assistant_core.retrieve_chunks(
+            # Evaluate the same relevance threshold used by the live assistant,
+            # not the raw unfiltered nearest-neighbour list.
+            retrieved = assistant_core.relevant_chunks(
                 str(case["question"]),
                 top_k=candidate_limit,
             )
@@ -120,6 +122,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "llm_calls": 0,
         "top_k": args.top_k,
         "repeats": args.repeats,
+        "retrieval_min_relevance": float(os.getenv("RAG_MIN_RELEVANCE", "0.18")),
         "document_count": len(documents),
         "query_count": len(cases),
         "database_path": str(db_path),
