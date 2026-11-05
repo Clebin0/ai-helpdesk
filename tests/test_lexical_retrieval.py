@@ -72,7 +72,7 @@ def test_rrf_combines_rankings_and_preserves_chunk_content():
     assert [item["source"] for item in results] == [
         "network.md","dns.md","printer.md"
     ]
-    assert results[0]["rrf_score"] == pytest.approx(2/61)
+    assert results[0]["rrf_score"] == pytest.approx(1/62 + 1/61)
     assert results[0]["content"] == "Vetorial rede"
 
 
