@@ -22,8 +22,23 @@ def tokenize(text: str) -> list[str]:
     normalized = "".join(char for char in normalized if not unicodedata.combining(char))
     normalized = normalized.replace("e-mail", "email").replace("e mail", "email")
     normalized = normalized.replace("wi-fi", "wifi").replace("wi fi", "wifi")
+    # Small domain-safe normalization for common Portuguese/English plurals.
+    token_forms = {
+        "links": "link",
+        "sites": "site",
+        "anexos": "anexo",
+        "arquivos": "arquivo",
+        "usuarios": "usuario",
+        "usuarios": "usuario",
+        "redes": "rede",
+        "processos": "processo",
+        "documentos": "documento",
+        "politicas": "politica",
+        "chaves": "chave",
+        "suspeito": "suspeita",
+    }
     return [
-        token
+        token_forms.get(token, token)
         for token in _TOKEN_PATTERN.findall(normalized)
         if len(token) > 1 and token not in _STOP_WORDS
     ]
