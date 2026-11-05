@@ -50,7 +50,59 @@ As cinco execuções abaixo usaram uma repetição por pergunta; elas servem par
 | 0.50 | 62,5% | 75,0% | 4/5 | 1/5 | 4 | 61,5% |
 | 0.55 | 53,1% | 62,5% | 5/5 | 0/5 | 6 | 62,5% |
 
-Mesmo quando 0.55 evita todas as cinco falsas recuperações, perde seis consultas respondíveis. Aumentar apenas o threshold não oferece um ponto de operação equilibrado neste corpus. A próxima hipótese técnica é comparar recuperação híbrida (lexical + vetorial) e reranking antes de calibrar novamente a abstenção.
+Mesmo quando 0.55 evita todas as cinco falsas recuperações, perde seis consultas respondíveis. Aumentar apenas o threshold não oferece um ponto de operação equilibrado neste corpus. Isso motivou o experimento de reranking lexical sobre candidatos vetoriais, medido abaixo.
+
+## Reranking lexical + vetorial — experimento v2
+
+O modo experimental `--retrieval-mode hybrid` parte dos oito candidatos mais próximos pela busca vetorial e os reordena por uma combinação de score semântico e cobertura lexical IDF. A normalização inclui variações comuns do vocabulário de suporte (por exemplo, “trazer de volta” e “restauração”). **Não é uma busca BM25/FTS independente**: o reranker só pode reordenar candidatos que a busca densa já encontrou.
+
+Parâmetros usados no experimento reproduzível:
+
+| Parâmetro | Valor |
+|---|---:|
+| Peso semântico | 0,80 |
+| Peso lexical | 0,20 |
+| Cobertura lexical mínima | 0,10 |
+| Resgate por score semântico | 0,55 |
+| RAG_MIN_RELEVANCE da execução | 0,18 |
+| K final | 4 |
+| Repetições | 3 |
+
+### Comparação com o retriever semântico
+
+| Métrica | Semântico (0.18) | Reranker (0.18) |
+|---|---:|---:|
+| Recall@4 de fontes esperadas | 100% | 93,75% |
+| Precision of returned | 38,02% | 91,67% |
+| Fontes retornadas por pergunta | 3,62 | 1,38 |
+| MRR | 100% | 100% |
+| Hit Rate@4 | 100% | 100% |
+| Consultas respondíveis com ao menos uma fonte esperada | 16/16 | 16/16 |
+| Abstenções corretas em consultas sem fonte | 0/5 | 5/5 |
+| Consultas sem fonte com recuperação indevida | 5/5 | 0/5 |
+| Consultas respondíveis sem fonte esperada | 0 | 0 |
+| F1 de abstenção | 0% | 100% |
+| Latência média | 8,541 ms | 9,462 ms |
+| Latência p95 | 11,012 ms | 12,117 ms |
+
+### Canônicas versus paráfrases com reranking
+
+| Tipo | Recall@4 | Precision of returned |
+|---|---:|---:|
+| Canônicas (8) | 93,75% | 87,50% |
+| Paráfrases (8) | 93,75% | 95,83% |
+
+Neste corpus, o reranker reduziu bastante as fontes irrelevantes enviadas ao contexto e se absteve nas cinco perguntas sem documentação, sem deixar perguntas respondíveis completamente sem evidência esperada. Em contrapartida, perdeu uma fonte esperada dentro de uma consulta que possuía mais de uma fonte correta. A latência média aumentou cerca de 0,9 ms.
+
+**Interpretação:** o experimento é promissor para reduzir contexto irrelevante e melhorar a abstenção, mas os números de 100% são observados em apenas cinco perguntas sintéticas fora do escopo e oito documentos sintéticos. Não são evidência de segurança ou qualidade em produção. Também não avaliam se a resposta textual do LLM recusa corretamente nem se cada afirmação gerada é sustentada pelas fontes.
+
+Reproduza com:
+
+~~~powershell
+python scripts/evaluate_rag.py --retrieval-mode hybrid --top-k 4 --repeats 3 --min-relevance 0.18
+~~~
+
+O modo padrão continua sendo `semantic`. O modo `hybrid` só é ativado explicitamente no benchmark e não foi integrado ao caminho de chat.
 
 **Configuração de produção preservada:** `RAG_MIN_RELEVANCE=0.18`. Nenhum valor do arquivo .env ou do padrão de produção foi alterado. Os resultados são experimentais e não justificam uma alteração automática.
 
