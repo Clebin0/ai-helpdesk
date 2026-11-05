@@ -1,17 +1,33 @@
-# AI Helpdesk — copiloto RAG com Hugging Face
+# AI Helpdesk — copiloto RAG local
 
-O classificador original TF-IDF continua separado e inalterado. O módulo /assistant adiciona busca semântica e geração de respostas com fontes.
+O classificador original TF-IDF continua separado e inalterado. O módulo /assistant adiciona busca semântica, recuperação de documentos e geração de respostas citadas.
 
-## Arquitetura
+## Arquitetura padrão (sem cobrança por chamada)
 
 1. Um mantenedor envia documentação aprovada para POST /assistant/ingest.
-2. O FastEmbed gera embeddings localmente, na CPU, usando um modelo multilíngue baixado do Hugging Face Hub.
-3. Os textos, as fontes e os vetores ficam armazenados no SQLite local.
+2. O FastEmbed gera embeddings localmente, na CPU, usando um modelo multilíngue.
+3. Textos, fontes e vetores são armazenados no SQLite local.
 4. O usuário envia uma pergunta para POST /assistant/chat.
-5. O sistema gera o embedding da pergunta localmente, calcula similaridade por cosseno e descarta resultados pouco relevantes.
-6. A Hugging Face Inference Providers gera uma resposta usando somente os trechos recuperados; a resposta inclui referências como [S1].
+5. A pergunta é vetorizada localmente; o sistema calcula similaridade por cosseno e descarta resultados pouco relevantes.
+6. O Ollama executa Qwen 3.5 4B localmente e responde com base nos trechos recuperados, citando referências como [S1].
 
-O endpoint OpenAI-compatible da Hugging Face é usado apenas para chat. Os embeddings não são enviados à API: são calculados localmente com FastEmbed/ONNX. O primeiro uso baixa o modelo; depois disso, a geração de embeddings funciona localmente e não consome créditos de inferência.
+O texto dos documentos e das perguntas não precisa ser enviado a um provedor externo no modo padrão. Depois de baixar os modelos, embeddings e geração de resposta são processados localmente. Não há cobrança por token; o custo é o uso de energia e recursos do próprio computador.
+
+## Modelos usados
+
+- Chat: qwen3.5:4b-q4_K_M via Ollama local.
+- Embeddings: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 via FastEmbed/ONNX, local e multilíngue.
+- Contexto do Ollama: 4096 tokens por padrão; ajuste OLLAMA_NUM_CTX se necessário.
+
+## Requisitos e instalação
+
+O modelo de chat ocupa aproximadamente 3,3 GB em disco. O modelo de embeddings ocupa cerca de 220 MB. O desempenho de geração depende do processador e da memória; em máquinas sem GPU compatível, o modelo roda na CPU e pode responder mais lentamente.
+
+Instale o Ollama para Windows a partir de https://ollama.com/download/windows. Depois, inicie o serviço Ollama e baixe o modelo:
+
+    ollama pull qwen3.5:4b-q4_K_M
+
+Verifique se o serviço responde em http://127.0.0.1:11434.
 
 ## Configuração local (PowerShell)
 
@@ -20,7 +36,19 @@ Copie o exemplo e edite o arquivo local:
     Copy-Item .env.example .env
     notepad .env
 
-No arquivo .env, preencha HF_TOKEN, ASSISTANT_ACCESS_TOKEN e ASSISTANT_ADMIN_TOKEN. Depois de editar, carregue as variáveis na mesma sessão do PowerShell que vai iniciar a API ou enviar chamadas:
+No modo padrão, mantenha:
+
+    LLM_PROVIDER=ollama
+    OLLAMA_BASE_URL=http://127.0.0.1:11434/v1
+    OLLAMA_CHAT_MODEL=qwen3.5:4b-q4_K_M
+    OLLAMA_NUM_CTX=4096
+    RAG_EMBEDDING_PROVIDER=local
+
+Preencha também ASSISTANT_ACCESS_TOKEN e ASSISTANT_ADMIN_TOKEN com valores independentes. Não reutilize credenciais de provedores. Para gerar cada token:
+
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+Depois de editar o .env, carregue as variáveis na sessão do PowerShell que iniciará a API:
 
     Get-Content .env | ForEach-Object {
       if ($_ -match '^\s*([^#=]+)\s*=(.*)$') {
@@ -28,22 +56,9 @@ No arquivo .env, preencha HF_TOKEN, ASSISTANT_ACCESS_TOKEN e ASSISTANT_ADMIN_TOK
       }
     }
 
-Esse comando não imprime os valores dos tokens.
+Esse comando não imprime os valores.
 
-Para criar o token da Hugging Face:
-
-1. Acesse https://huggingface.co/settings/tokens.
-2. Crie um token Fine-grained.
-3. Habilite a permissão Make calls to Inference Providers.
-4. Copie o token para HF_TOKEN no .env. Não envie esse valor no chat, não o coloque no Git e não tire print mostrando o token.
-
-O padrão usa Qwen/Qwen3.5-9B:cheapest no chat. O sufixo :cheapest pede ao roteador da Hugging Face o provedor disponível com menor custo para esse modelo. Você pode trocar HF_CHAT_MODEL por outro modelo listado em https://huggingface.co/inference/models.
-
-## Limite de uso
-
-Contas gratuitas da Hugging Face recebem atualmente US$ 0,10 por mês para Inference Providers; esse valor pode mudar. Depois que a cota acabar, novas chamadas podem falhar até o próximo ciclo ou até a conta adicionar créditos. Este projeto não compra créditos nem habilita recarga. Confira o uso em https://huggingface.co/settings/billing e não adicione forma de pagamento para este teste.
-
-## Instalação e execução
+## Executar a API
 
     .\.venv\Scripts\Activate.ps1
     python -m pip install -r requirements.txt
@@ -52,13 +67,21 @@ Contas gratuitas da Hugging Face recebem atualmente US$ 0,10 por mês para Infer
 
 Abra http://127.0.0.1:8001/docs.
 
-A primeira indexação pode levar mais tempo porque o FastEmbed baixa o modelo sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2. O download é feito do Hugging Face Hub; as inferências de embeddings seguintes são locais.
+A aplicação espera que o serviço Ollama esteja em execução. A API local do Ollama é compatível com o cliente OpenAI em http://127.0.0.1:11434/v1; o valor da chave é ignorado pelo servidor local.
 
-## Verificar a configuração
+## Provedores opcionais
 
-    Invoke-RestMethod -Uri 'http://127.0.0.1:8001/assistant/health'
+O Hugging Face continua disponível como alternativa:
 
-A resposta mostra o provedor, os modelos e indicadores booleanos de configuração. Ela nunca retorna tokens ou chaves.
+    LLM_PROVIDER=huggingface
+    HF_TOKEN=seu_token
+    HF_CHAT_MODEL=Qwen/Qwen3.5-9B:cheapest
+
+O token precisa da permissão Make calls to Inference Providers. O roteador OpenAI-compatible da Hugging Face atende chat completions; os embeddings continuam locais. A conta testada retornou HTTP 402 informando que é necessário comprar créditos pré-pagos ou ter créditos incluídos em plano PRO. Por esse motivo, o modo Hugging Face não é o padrão e não deve ser tratado como gratuito para essa conta.
+
+Para usar OpenAI em uma instalação com créditos, defina LLM_PROVIDER=openai, RAG_EMBEDDING_PROVIDER=openai e configure OPENAI_API_KEY e os nomes de modelos.
+
+Ao mudar o modelo de embedding, os vetores de outro modelo não são comparáveis. Reindexe os documentos que deseja consultar com o novo modelo; os vetores antigos são mantidos sob o namespace anterior.
 
 ## Indexar um documento
 
@@ -66,7 +89,7 @@ Envie apenas documentação que você tem autorização para usar. Não envie da
 
     $body = @{
       source = 'network-dns-runbook.md'
-      content = 'DNS: confirme usuários afetados, endereço IP, gateway e resolvedores configurados. Teste a resolução de nomes e registre o erro exato. Não altere configurações de produção sem aprovação.'
+      content = 'DNS: confirme usuários afetados, endereço IP, gateway e resolvedores configurados. Teste a resolução com nslookup e registre a mensagem de erro. Não altere configurações de produção sem aprovação.'
     } | ConvertTo-Json
 
     Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8001/assistant/ingest' -Headers @{ 'X-Admin-Token' = $env:ASSISTANT_ADMIN_TOKEN } -ContentType 'application/json' -Body $body
@@ -77,29 +100,25 @@ Envie apenas documentação que você tem autorização para usar. Não envie da
 
     Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8001/assistant/chat' -Headers @{ 'X-Assistant-Token' = $env:ASSISTANT_ACCESS_TOKEN } -ContentType 'application/json' -Body $body
 
-O resultado contém a resposta, os modelos utilizados e as fontes citadas. O modelo é orientado a declarar quando a base não contém informação suficiente. Isso reduz respostas sem suporte, mas não garante correção factual: confira as fontes antes de agir.
+A resposta contém texto, nomes dos modelos e fontes citadas. O modelo é orientado a declarar quando não há informação suficiente. Confira os trechos originais antes de executar procedimentos.
 
-## Provedores opcionais
+## Endpoints e segurança
 
-O padrão é LLM_PROVIDER=huggingface e RAG_EMBEDDING_PROVIDER=local.
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | /assistant/health | Público; apenas estado de configuração |
+| GET | /assistant/documents | X-Admin-Token |
+| POST | /assistant/ingest | X-Admin-Token |
+| POST | /assistant/chat | X-Assistant-Token |
 
-Para usar OpenAI em uma instalação que tenha créditos, defina LLM_PROVIDER=openai e RAG_EMBEDDING_PROVIDER=openai, configure OPENAI_API_KEY e os nomes de modelos. Não é necessário configurar OpenAI para o modo Hugging Face + embeddings locais.
+O conteúdo recuperado é dado não confiável. Instruções inseridas em documentos não podem mudar o papel do assistente. Ele não solicita senhas, tokens ou códigos MFA e não executa ações em sistemas.
 
-Ao mudar o modelo de embedding, documentos já indexados com outro modelo não aparecem na nova coleção lógica. Reindexe os documentos que deseja consultar com o novo modelo. Os vetores antigos não são apagados automaticamente.
+Mantenha a API em rede confiável. Antes de expor para terceiros, use HTTPS, controle de identidade e proteção contra abuso.
 
-## Segurança e limites conhecidos
+## Limites conhecidos
 
-- A API exige X-Admin-Token para ingestão/listagem e X-Assistant-Token para chat.
-- O conteúdo recuperado é tratado como dado não confiável; instruções inseridas em documentos não podem mudar o papel do assistente.
-- O sistema não solicita senhas, tokens ou códigos MFA e não executa ações nos sistemas.
-- Mantenha o serviço em rede confiável. Antes de expor para terceiros, use HTTPS, controle de identidade e proteção contra abuso.
-- A busca linear em SQLite atende ao objetivo didático; avalie pgvector ou banco vetorial dedicado para escalar.
-- Chunking é baseado em caracteres, não em tokens. O limite de relevância RAG_MIN_RELEVANCE precisa ser avaliado com perguntas reais e documentos revisados.
-- Ainda faltam avaliações sistemáticas de precisão/recall, qualidade das citações, abstenção e latência. Não classifique o módulo como pronto para produção sem essas avaliações.
-
-## Diagnóstico de erros
-
-- HTTP 402: a cota/crédito de inferência da Hugging Face acabou ou não está disponível. Confira o painel; o sistema não habilita compra de créditos.
-- HTTP 429: limite temporário do provedor. Aguarde antes de repetir.
-- HTTP 503: configuração ausente, token inválido/sem permissão ou dependência local indisponível.
-- HTTP 502: falha não classificada do provedor. Consulte os logs locais sem compartilhar chaves ou tokens.
+- Busca linear em SQLite; avalie pgvector ou banco vetorial dedicado para escalar.
+- Chunking baseado em caracteres, não tokens.
+- O limiar RAG_MIN_RELEVANCE exige avaliação com um conjunto de perguntas reais.
+- Sem memória de conversa, busca híbrida, reranker ou execução de ferramentas.
+- Faltam avaliações sistemáticas de precisão/recall, qualidade de citações, abstenção e latência. Não classifique o módulo como pronto para produção sem essas avaliações.

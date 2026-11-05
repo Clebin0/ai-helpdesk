@@ -140,6 +140,7 @@ def test_api_ingest_and_chat_return_cited_sources(monkeypatch, tmp_path):
 
 
 def test_health_does_not_expose_credentials(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "huggingface")
     monkeypatch.setenv("HF_TOKEN", "hf-super-secret-key")
     monkeypatch.setenv("OPENAI_API_KEY", "openai-super-secret-key")
     response = client.get("/assistant/health")
@@ -246,3 +247,44 @@ def test_huggingface_chat_uses_openai_compatible_router(monkeypatch):
     assert completions.call["model"] == "test/model"
     assert completions.call["max_tokens"] == 650
     assert completions.call["messages"][0]["role"] == "system"
+
+
+
+def test_ollama_chat_uses_local_openai_compatible_endpoint(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setenv("OLLAMA_CHAT_MODEL", "qwen3.5:4b-q4_K_M")
+    monkeypatch.setenv("OLLAMA_NUM_CTX", "4096")
+
+    class FakeMessage:
+        content = "Verifique o resolvedor DNS e execute nslookup [S1]."
+
+    class FakeChoice:
+        message = FakeMessage()
+
+    class FakeResponse:
+        choices = [FakeChoice()]
+
+    class FakeCompletions:
+        def __init__(self):
+            self.call = None
+
+        def create(self, **kwargs):
+            self.call = kwargs
+            return FakeResponse()
+
+    completions = FakeCompletions()
+
+    class FakeClient:
+        chat = type("Chat", (), {"completions": completions})()
+
+    monkeypatch.setattr(assistant_core, "_ollama_client", lambda: FakeClient())
+    answer = assistant_core.generate_answer(
+        "Como testar DNS?",
+        [{"source": "dns.md", "chunk_index": 0, "content": "Teste o resolvedor DNS."}],
+    )
+
+    assert answer == "Verifique o resolvedor DNS e execute nslookup [S1]."
+    assert completions.call["model"] == "qwen3.5:4b-q4_K_M"
+    assert completions.call["max_tokens"] == 240
+    assert completions.call["reasoning_effort"] == "none"
+    assert completions.call["extra_body"]["options"]["num_ctx"] == 4096

@@ -25,7 +25,7 @@ _embedding_model_lock = threading.Lock()
 
 
 def llm_provider() -> str:
-    return os.getenv("LLM_PROVIDER", "huggingface").strip().lower()
+    return os.getenv("LLM_PROVIDER", "ollama").strip().lower()
 
 
 def embedding_provider() -> str:
@@ -38,11 +38,13 @@ def local_embedding_model() -> str:
 
 def chat_model() -> str:
     provider = llm_provider()
+    if provider == "ollama":
+        return os.getenv("OLLAMA_CHAT_MODEL", "qwen3.5:4b-q4_K_M").strip()
     if provider == "huggingface":
         return os.getenv("HF_CHAT_MODEL", DEFAULT_HF_CHAT_MODEL).strip()
     if provider == "openai":
         return os.getenv("OPENAI_CHAT_MODEL", DEFAULT_OPENAI_CHAT_MODEL).strip()
-    raise RuntimeError("LLM_PROVIDER must be 'huggingface' or 'openai'.")
+    raise RuntimeError("LLM_PROVIDER must be 'ollama', 'huggingface' or 'openai'.")
 
 
 def embedding_model() -> str:
@@ -83,6 +85,20 @@ def _huggingface_client():
         base_url="https://router.huggingface.co/v1",
         api_key=token,
         timeout=60.0,
+        max_retries=0,
+    )
+
+
+def _ollama_client():
+    from openai import OpenAI
+
+    base_url = os.getenv(
+        "OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1"
+    ).rstrip("/")
+    return OpenAI(
+        base_url=base_url,
+        api_key="ollama",
+        timeout=180.0,
         max_retries=0,
     )
 
@@ -342,16 +358,27 @@ def generate_answer(question: str, retrieved: list[dict[str, Any]]) -> str:
     )
 
     provider = llm_provider()
-    if provider == "huggingface":
-        response = _huggingface_client().chat.completions.create(
-            model=chat_model(),
-            messages=[
+    if provider in {"huggingface", "ollama"}:
+        client = (
+            _huggingface_client()
+            if provider == "huggingface"
+            else _ollama_client()
+        )
+        request_options: dict[str, Any] = {
+            "model": chat_model(),
+            "messages": [
                 {"role": "system", "content": instructions},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=650,
-            temperature=0.2,
-        )
+            "max_tokens": 240 if provider == "ollama" else 650,
+            "temperature": 0.2,
+        }
+        if provider == "ollama":
+            request_options["reasoning_effort"] = "none"
+            request_options["extra_body"] = {
+                "options": {"num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "4096"))}
+            }
+        response = client.chat.completions.create(**request_options)
         answer = response.choices[0].message.content
     elif provider == "openai":
         response = _openai_client().responses.create(
@@ -362,7 +389,9 @@ def generate_answer(question: str, retrieved: list[dict[str, Any]]) -> str:
         )
         answer = getattr(response, "output_text", None)
     else:
-        raise RuntimeError("LLM_PROVIDER must be 'huggingface' or 'openai'.")
+        raise RuntimeError(
+            "LLM_PROVIDER must be 'ollama', 'huggingface' or 'openai'."
+        )
 
     if not isinstance(answer, str) or not answer.strip():
         raise RuntimeError("The model returned an empty response.")
