@@ -29,6 +29,8 @@ def test_retrieval_metrics_deduplicate_chunks_by_source():
 
     assert result["recall_at_k"] == 1.0
     assert result["precision_at_k"] == 1.0
+    assert result["precision_of_returned"] == 1.0
+    assert result["average_sources_returned"] == 2.0
     assert result["mrr"] == 1.0
     assert result["hit_rate_at_k"] == 1.0
     assert result["per_query"][0]["retrieved_sources"] == ["dns.md", "gateway.md"]
@@ -47,6 +49,7 @@ def test_retrieval_metrics_penalize_relevant_source_ranked_second():
 
     assert result["recall_at_k"] == 1.0
     assert result["precision_at_k"] == 0.5
+    assert result["precision_of_returned"] == 0.5
     assert result["mrr"] == 0.5
 
 
@@ -56,6 +59,8 @@ def test_retrieval_metrics_return_zero_for_no_results():
 
     assert result["recall_at_k"] == 0.0
     assert result["precision_at_k"] == 0.0
+    assert result["precision_of_returned"] == 0.0
+    assert result["average_sources_returned"] == 0.0
     assert result["mrr"] == 0.0
     assert result["hit_rate_at_k"] == 0.0
 
