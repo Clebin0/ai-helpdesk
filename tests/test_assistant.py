@@ -405,7 +405,8 @@ def test_stream_endpoint_emits_metadata_tokens_and_done(monkeypatch, tmp_path):
     assert received_history[0]["content"] == "O problema começou hoje."
 
 
-def test_stream_endpoint_requires_chat_token():
+def test_stream_endpoint_requires_chat_token(monkeypatch):
+    monkeypatch.setenv("ASSISTANT_ACCESS_TOKEN", "test-chat-token")
     response = client.post(
         "/assistant/chat/stream",
         json={"question": "Como diagnosticar DNS?"},
