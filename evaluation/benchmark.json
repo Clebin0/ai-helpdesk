@@ -40,7 +40,7 @@
     {
       "id": "dns-windows",
       "question": "Como testar se o problema é DNS no Windows?",
-      "expected_sources": ["dns-resolution.md"]
+      "expected_sources": ["dns-resolution.md", "network-gateway.md"]
     },
     {
       "id": "gateway-but-no-sites",
