@@ -141,6 +141,10 @@ Execute na raiz do repositório, com o ambiente virtual ativado:
 
     python scripts/evaluate_rag.py --top-k 4 --repeats 3
 
+Para testar outro corte sem alterar o arquivo .env:
+
+    python scripts/evaluate_rag.py --top-k 4 --repeats 3 --min-relevance 0.32
+
 Opcionalmente, salve o relatório JSON:
 
     python scripts/evaluate_rag.py --top-k 4 --repeats 3 --output evaluation/results/latest.json
@@ -150,7 +154,9 @@ O benchmark usa por padrão `data/rag-benchmark.sqlite3`, separado de `data/assi
 ### Métricas
 
 - **Recall@K:** proporção das fontes esperadas encontradas entre as K primeiras fontes únicas.
-- **Precision@K:** proporção das K posições ocupadas por fontes esperadas.
+- **Precision@K:** proporção das K posições ocupadas por fontes esperadas; posições sem resultado também contam no denominador.
+- **Precision of returned:** proporção de fontes esperadas entre as fontes efetivamente retornadas após o filtro de relevância.
+- **Average sources returned:** quantidade média de fontes fornecidas ao contexto por pergunta.
 - **MRR:** posição da primeira fonte esperada; quanto mais cedo ela aparece, maior a pontuação.
 - **Hit Rate@K:** proporção de perguntas com pelo menos uma fonte esperada recuperada.
 - **Latência:** média, mediana e p95 das consultas, após a indexação. A primeira inicialização/download do modelo não entra no tempo de consulta.
@@ -164,6 +170,8 @@ Para avaliar respostas capturadas do assistente, prepare um JSON com `query_id`,
     python scripts/evaluate_rag.py --answers caminho/para/respostas.json
 
 A auditoria mede se os identificadores [S1], [S2] etc. existem nos metadados retornados e se apontam para fontes esperadas pelo benchmark. Ela **não prova que o trecho citado sustenta semanticamente cada afirmação**. Essa verificação exige revisão humana ou um protocolo de avaliação semântica separado.
+
+O valor passado em `--min-relevance` vale apenas naquela execução. Compare Recall@K, Precision of returned e a quantidade de fontes retornadas; um corte alto demais pode remover uma fonte necessária. O valor 0.32 é um ponto de experimentação observado neste corpus sintético, não uma configuração universal recomendada.
 
 O corpus e as perguntas são artificiais e servem para comparar alterações no retriever. Não representam chamados reais nem garantem desempenho em produção. Mantenha o mesmo corpus, modelo de embedding, K e configuração ao comparar execuções.
 
