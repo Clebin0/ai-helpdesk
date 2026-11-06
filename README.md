@@ -115,3 +115,14 @@ O repositório também contém um copiloto de suporte separado do classificador 
 - Hugging Face e OpenAI continuam como provedores opcionais, sujeitos a disponibilidade e créditos.
 
 Consulte [docs/LLM_RAG.md](docs/LLM_RAG.md) para configuração, interface, chamadas de API, segurança e limitações.
+
+## Fundamentos práticos de LLM
+
+O diretório [examples/llm_foundations](examples/llm_foundations/README.md) reúne exemplos independentes para estudar chamadas a LLMs sem depender de créditos de API:
+
+- Cliente HTTP para Ollama com validação de entrada, timeout e limite de resposta.
+- Chat completion com mensagens `system` e `user`.
+- Saída estruturada com JSON Schema e validação Pydantic.
+- Testes automatizados com respostas simuladas, sem inferência ou rede.
+
+O laboratório usa o modelo local configurado no Ollama. As saídas são sugestões e precisam ser validadas; os exemplos não executam ações em sistemas.
