@@ -35,12 +35,23 @@ class ChatRequest(AssistantInput):
     history: list[ChatTurn] = Field(default_factory=list, max_length=8)
 
 
+MIN_ACCESS_TOKEN_LENGTH = 32
+
+
 def _authorize(provided: str | None, variable: str) -> None:
     expected = os.getenv(variable)
     if not expected:
         raise HTTPException(
             status_code=503,
             detail=f"{variable} is not configured. See docs/LLM_RAG.md.",
+        )
+    if len(expected) < MIN_ACCESS_TOKEN_LENGTH:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"{variable} must contain at least {MIN_ACCESS_TOKEN_LENGTH} characters. "
+                "Generate a new token with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            ),
         )
     if not provided or not secrets.compare_digest(provided, expected):
         raise HTTPException(status_code=401, detail="Invalid or missing access token.")
