@@ -57,6 +57,8 @@ Preencha ASSISTANT_ACCESS_TOKEN e ASSISTANT_ADMIN_TOKEN com valores independente
 
     python -c "import secrets; print(secrets.token_urlsafe(32))"
 
+Cada token precisa ter pelo menos 32 caracteres. Use valores diferentes para chat e administração. A API rejeita tokens menores, mesmo quando eles estão configurados no arquivo .env.
+
 Depois de editar o .env, carregue as variáveis na sessão do PowerShell que iniciará a API:
 
     Get-Content .env | ForEach-Object {
