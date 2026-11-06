@@ -30,8 +30,8 @@ def configure_test_environment(monkeypatch, tmp_path):
     monkeypatch.setenv("HF_TOKEN", "hf_test_not_real")
     monkeypatch.setenv("LLM_PROVIDER", "huggingface")
     monkeypatch.setenv("RAG_EMBEDDING_PROVIDER", "local")
-    monkeypatch.setenv("ASSISTANT_ADMIN_TOKEN", "test-admin-token")
-    monkeypatch.setenv("ASSISTANT_ACCESS_TOKEN", "test-chat-token")
+    monkeypatch.setenv("ASSISTANT_ADMIN_TOKEN", "test-admin-token-0123456789abcdef")
+    monkeypatch.setenv("ASSISTANT_ACCESS_TOKEN", "test-chat-token-0123456789abcdef")
     monkeypatch.setattr(assistant_core, "embed_texts", deterministic_embeddings)
 
 
@@ -110,6 +110,37 @@ def test_api_requires_admin_and_chat_tokens(monkeypatch, tmp_path):
     assert no_chat.status_code == 401
 
 
+def test_api_rejects_short_chat_access_token(monkeypatch, tmp_path):
+    configure_test_environment(monkeypatch, tmp_path)
+    monkeypatch.setenv("ASSISTANT_ACCESS_TOKEN", "short-token")
+
+    response = client.post(
+        "/assistant/chat",
+        headers={"X-Assistant-Token": "short-token"},
+        json={"question": "Como diagnosticar DNS?"},
+    )
+
+    assert response.status_code == 503
+    assert "at least 32 characters" in response.json()["detail"]
+
+
+def test_api_rejects_short_admin_access_token(monkeypatch, tmp_path):
+    configure_test_environment(monkeypatch, tmp_path)
+    monkeypatch.setenv("ASSISTANT_ADMIN_TOKEN", "short-token")
+
+    response = client.post(
+        "/assistant/ingest",
+        headers={"X-Admin-Token": "short-token"},
+        json={
+            "source": "network.md",
+            "content": "DNS and network diagnostic guide.",
+        },
+    )
+
+    assert response.status_code == 503
+    assert "at least 32 characters" in response.json()["detail"]
+
+
 def test_api_ingest_and_chat_return_cited_sources(monkeypatch, tmp_path):
     configure_test_environment(monkeypatch, tmp_path)
     monkeypatch.setattr(
@@ -119,7 +150,7 @@ def test_api_ingest_and_chat_return_cited_sources(monkeypatch, tmp_path):
     )
     ingested = client.post(
         "/assistant/ingest",
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers={"X-Admin-Token": "test-admin-token-0123456789abcdef"},
         json={
             "source": "network-runbook.md",
             "content": "DNS diagnostics: verify the resolver, gateway and affected network.",
@@ -130,7 +161,7 @@ def test_api_ingest_and_chat_return_cited_sources(monkeypatch, tmp_path):
 
     response = client.post(
         "/assistant/chat",
-        headers={"X-Assistant-Token": "test-chat-token"},
+        headers={"X-Assistant-Token": "test-chat-token-0123456789abcdef"},
         json={"question": "How do I troubleshoot DNS on the network?"},
     )
     assert response.status_code == 200
@@ -155,7 +186,7 @@ def test_health_does_not_expose_credentials(monkeypatch):
 def test_api_rejects_extra_fields():
     response = client.post(
         "/assistant/chat",
-        headers={"X-Assistant-Token": "test-chat-token"},
+        headers={"X-Assistant-Token": "test-chat-token-0123456789abcdef"},
         json={"question": "How do I troubleshoot DNS?", "raw_api_key": "no"},
     )
     assert response.status_code == 422
@@ -185,7 +216,7 @@ def test_ingest_reports_exhausted_provider_credits(monkeypatch, tmp_path):
     monkeypatch.setattr(assistant_core, "ingest_document", fail_ingestion)
     response = client.post(
         "/assistant/ingest",
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers={"X-Admin-Token": "test-admin-token-0123456789abcdef"},
         json={
             "source": "network-runbook.md",
             "content": "DNS diagnostics: verify the resolver and gateway.",
@@ -204,7 +235,7 @@ def test_chat_reports_exhausted_provider_credits(monkeypatch, tmp_path):
     monkeypatch.setattr(assistant_core, "answer_question", fail_answer)
     response = client.post(
         "/assistant/chat",
-        headers={"X-Assistant-Token": "test-chat-token"},
+        headers={"X-Assistant-Token": "test-chat-token-0123456789abcdef"},
         json={"question": "Como diagnosticar DNS?"},
     )
     assert response.status_code == 402
@@ -390,7 +421,7 @@ def test_stream_endpoint_emits_metadata_tokens_and_done(monkeypatch, tmp_path):
     monkeypatch.setattr(assistant_core, "generate_answer_stream", fake_stream)
     response = client.post(
         "/assistant/chat/stream",
-        headers={"X-Assistant-Token": "test-chat-token"},
+        headers={"X-Assistant-Token": "test-chat-token-0123456789abcdef"},
         json={
             "question": "Como testar DNS no Windows?",
             "history": [{"role": "user", "content": "O problema começou hoje."}],
@@ -406,7 +437,7 @@ def test_stream_endpoint_emits_metadata_tokens_and_done(monkeypatch, tmp_path):
 
 
 def test_stream_endpoint_requires_chat_token(monkeypatch):
-    monkeypatch.setenv("ASSISTANT_ACCESS_TOKEN", "test-chat-token")
+    monkeypatch.setenv("ASSISTANT_ACCESS_TOKEN", "test-chat-token-0123456789abcdef")
     response = client.post(
         "/assistant/chat/stream",
         json={"question": "Como diagnosticar DNS?"},
