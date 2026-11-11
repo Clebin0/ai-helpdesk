@@ -86,6 +86,16 @@ python scripts/evaluate_rag.py --retrieval-mode hybrid --top-k 4 --repeats 3 --m
 python scripts/evaluate_rag.py --retrieval-mode rrf --top-k 4 --repeats 3 --min-relevance 0.18 --rrf-bm25-cutoff -2.5
 ```
 
+O avaliador local tenta novamente saídas JSON truncadas, descarta IDs de fonte vazios/malformados com aviso e continua o benchmark se a etapa de juiz falhar; essas falhas ficam explícitas no relatório, sem serem tratadas como abstenção segura.
+
+Para avaliar o fluxo completo com geração local, fundamentação das afirmações e abstenção em perguntas sem resposta, execute primeiro a amostra balanceada:
+
+```bash
+python scripts/evaluate_rag_e2e.py
+# benchmark completo: 21 perguntas, somente Ollama e FastEmbed locais
+python scripts/evaluate_rag_e2e.py --limit 21 --output evaluation/results/e2e-latest.json
+```
+
 Para auditar citações de respostas capturadas, use o formato de `evaluation/answers.example.json` e passe o arquivo com `--answers`. A auditoria verifica integridade dos IDs e alinhamento com fontes esperadas; não substitui avaliação humana de suporte semântico. A avaliação v2 também mede a abstenção do retriever, não a qualidade textual da recusa do LLM. O modo hybrid é um reranker lexical experimental sobre candidatos vetoriais. O modo rrf adiciona busca BM25 independente com SQLite FTS5 e Reciprocal Rank Fusion; neste corpus, obteve 93,75% de Recall@4, 91,67% de Precision of returned e 5/5 abstenções corretas. Ambos permanecem fora do caminho de produção.
 
 Veja [docs/LLM_RAG.md](docs/LLM_RAG.md) para métricas, limitações e detalhes de execução. Os resultados medidos localmente estão em [evaluation/RESULTS.md](evaluation/RESULTS.md).
@@ -115,3 +125,23 @@ O repositório também contém um copiloto de suporte separado do classificador 
 - Hugging Face e OpenAI continuam como provedores opcionais, sujeitos a disponibilidade e créditos.
 
 Consulte [docs/LLM_RAG.md](docs/LLM_RAG.md) para configuração, interface, chamadas de API, segurança e limitações.
+
+## Fundamentos práticos de LLM
+
+O diretório [examples/llm_foundations](examples/llm_foundations/README.md) reúne exemplos independentes para estudar chamadas a LLMs sem depender de créditos de API:
+
+- Cliente HTTP para Ollama com validação de entrada, timeout e limite de resposta.
+- Chat completion com mensagens `system` e `user`.
+- Saída estruturada com JSON Schema e validação Pydantic.
+- Embeddings multilíngues locais com FastEmbed.
+- Busca semântica por similaridade de cosseno, com trechos e citações de origem.
+- Auditoria experimental, com LLM local, de afirmações sustentadas, não sustentadas ou sem evidência suficiente.
+- Testes automatizados com respostas e embeddings simulados, sem inferência ou rede.
+
+O laboratório usa Ollama e FastEmbed localmente. A busca semântica recupera evidências, mas similaridade não é uma probabilidade de acerto. As saídas são sugestões e precisam ser validadas; os exemplos não executam ações em sistemas.
+
+## Multi-agent Assistant (experimental)
+
+The repository includes an initial, in-process multi-agent workflow that combines the existing deterministic ticket triage and LLM/RAG knowledge assistant. It exposes an authenticated, read-only endpoint at `POST /agents/assist`. The workflow includes a coordinator, triage specialist, knowledge specialist, and structural citation-integrity reviewer. It has no shell, arbitrary network, filesystem, ticket-write, or infrastructure-remediation tools.
+
+See [docs/AGENT_RUNTIME.md](docs/AGENT_RUNTIME.md) for request examples, the response contract, security boundaries, and test commands. Citation-ID checking is not semantic grounding; missing or unknown citation references are escalated for human review.

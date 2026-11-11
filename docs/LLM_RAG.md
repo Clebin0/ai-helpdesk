@@ -171,6 +171,35 @@ Para avaliar respostas capturadas do assistente, prepare um JSON com `query_id`,
 
 A auditoria mede se os identificadores [S1], [S2] etc. existem nos metadados retornados e se apontam para fontes esperadas pelo benchmark. Ela **não prova que o trecho citado sustenta semanticamente cada afirmação**. Essa verificação exige revisão humana ou um protocolo de avaliação semântica separado.
 
+Para experimentar uma avaliação semântica auxiliar, o laboratório isolado inclui um juiz local em `examples/llm_foundations/grounding.py`. Ele divide a resposta em afirmações factuais, compara cada uma com os trechos fornecidos e classifica o suporte. A associação das citações usa uma correspondência textual exata normalizada entre a afirmação e a frase original; somente as citações presentes nessa mesma frase contam para a cobertura. IDs que o juiz sugerir sem correspondência ficam visíveis como não verificados. Isso é intencionalmente conservador: paráfrases podem ficar sem associação, mas o sistema não tenta adivinhar a qual frase a citação pertence. Execute `python -m examples.llm_foundations.grounding_evaluation --input evaluation/grounding.example.json`. O juiz não participa do endpoint de produção, não usa conhecimento externo como evidência e não prova que uma afirmação é verdadeira. Como todo avaliador baseado em LLM, pode falhar; valide uma amostra manualmente e nunca trate a pontuação como certificação.
+
+### Avaliação end-to-end: recuperação + resposta + fundamentação
+
+O runner `scripts/evaluate_rag_e2e.py` executa o fluxo completo em uma base SQLite isolada: indexa o corpus sintético, recupera trechos, gera uma resposta com o assistente local e compara as afirmações com os trechos efetivamente enviados ao modelo. Ele também avalia consultas sem resposta prevista.
+
+Faça primeiro uma amostra balanceada de seis perguntas (duas canônicas, duas paráfrases e duas sem resposta):
+
+    python scripts/evaluate_rag_e2e.py
+
+Execute as 21 perguntas para a avaliação completa:
+
+    python scripts/evaluate_rag_e2e.py --limit 21 --output evaluation/results/e2e-latest.json
+
+O avaliador end-to-end também permite comparar os retrievers sem alterar o endpoint de produção. O modo padrão `semantic` reproduz o fluxo atual. Para testar o reranker híbrido ou a fusão RRF com o mesmo Qwen, execute:
+
+    python scripts/evaluate_rag_e2e.py --retrieval-mode hybrid --limit 21 --output evaluation/results/e2e-hybrid.json
+    python scripts/evaluate_rag_e2e.py --retrieval-mode rrf --limit 21 --output evaluation/results/e2e-rrf.json
+
+Os modos `hybrid` e `rrf` são experimentais e existem apenas no runner de avaliação. Eles usam os mesmos parâmetros do benchmark de recuperação: peso semântico 0.80, cobertura lexical mínima 0.10, resgate semântico 0.55 e, no RRF, corte BM25 -2.5. Os valores podem ser ajustados por CLI; o relatório registra modo e parâmetros para permitir comparação reproduzível. O modo RRF cria um índice FTS5 em memória e separado da base do assistente. Compare cobertura, abstinência, suporte das afirmações e relevância das citações antes de considerar qualquer mudança no caminho de produção.
+
+O runner força `LLM_PROVIDER=ollama` e `RAG_EMBEDDING_PROVIDER=local`, independentemente da configuração de provedores no `.env`. Portanto, não usa créditos de APIs hospedadas. O Ollama precisa estar em execução e o modelo de chat disponível; a primeira indexação pode baixar o modelo FastEmbed. O SQLite padrão é `data/rag-e2e-benchmark.sqlite3`, separado tanto da base do assistente quanto do banco do benchmark de recuperação.
+
+O relatório separa quatro grupos: (1) cobertura da recuperação e abstenção do retriever; (2) quantidade de respostas geradas e proxy de abstenção em perguntas sem resposta; (3) proporção de afirmações `supported`, `unsupported` e `insufficient_evidence`; (4) integridade das citações e alinhamento com as fontes esperadas. O campo `unanswerable_safe_abstention_proxy_rate` conta respostas sem afirmações factuais identificadas, mas isso **não prova** que a recusa em linguagem natural esteja correta. O juiz continua sendo um LLM: seus vereditos exigem revisão humana.
+
+O juiz tenta gerar JSON estruturado com até duas tentativas e aumenta o limite de tokens na segunda. IDs vazios, malformados ou duplicados em campos opcionais são descartados e registrados em `limitations`; IDs sintaticamente válidos mas ausentes das fontes (por exemplo, `S99`) continuam visíveis e são contabilizados como referências inválidas. Se a avaliação do juiz falhar após a repetição, o runner preserva a resposta gerada, registra `grounding_error` e continua para a próxima pergunta. Essas respostas são contabilizadas como falhas de avaliação, nunca como prova de abstenção segura.
+
+A amostra padrão reduz o número de chamadas locais durante o primeiro teste. `--limit 21` executa todas as perguntas. `--top-k` pode variar de 1 a 4 para manter o orçamento de contexto do juiz de evidências. O relatório inclui a resposta gerada por consulta para permitir inspeção e comparação.
+
 O valor passado em `--min-relevance` vale apenas naquela execução. Compare Recall@K, Precision of returned, as métricas de abstenção e a quantidade de fontes retornadas; um corte alto demais pode remover uma fonte necessária. No benchmark v2, o modo semântico com 0.18 retornou fontes para as cinco consultas sem resposta. Aumentar o threshold até 0.55 bloqueou todas, mas reduziu o recall para 53,1%.
 
 Existe um reranker lexical experimental, acionado apenas por `--retrieval-mode hybrid`:

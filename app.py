@@ -9,7 +9,7 @@ import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -217,6 +217,43 @@ def triage_batch(body: BatchIn):
     }
 
 
-from assistant_api import router as assistant_router
+from assistant_api import ChatTurn, _authorize, router as assistant_router
+from agent_orchestrator import run_agent_workflow
+import assistant_core
 
 app.include_router(assistant_router)
+
+
+class AgentAssistRequest(InputModel):
+    question: str | None = Field(default=None, min_length=5, max_length=3000)
+    ticket: Ticket | None = None
+    top_k: int = Field(default=4, ge=1, le=8)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=8)
+
+
+@app.post("/agents/assist", tags=["Multi-agent Assistant"])
+def agents_assist(
+    body: AgentAssistRequest,
+    x_assistant_token: str | None = Header(default=None),
+):
+    """Run the local triage and knowledge specialists with read-only capabilities."""
+    _authorize(x_assistant_token, "ASSISTANT_ACCESS_TOKEN")
+    if not body.question and body.ticket is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide a question, a ticket, or both.",
+        )
+
+    try:
+        return run_agent_workflow(
+            question=body.question,
+            ticket=body.ticket.model_dump() if body.ticket is not None else None,
+            top_k=body.top_k,
+            history=[turn.model_dump() for turn in body.history],
+            triage_agent=lambda payload: triage_one(Ticket.model_validate(payload)),
+            knowledge_agent=assistant_core.answer_question,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
