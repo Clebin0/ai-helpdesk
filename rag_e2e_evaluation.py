@@ -81,9 +81,19 @@ def evaluate_end_to_end(
             raise ValueError(f"Execution {query_id} retrieved_sources must be a list.")
         if not isinstance(execution.get("used_llm"), bool):
             raise ValueError(f"Execution {query_id} must define boolean used_llm.")
+        citations: set[str] = set()
+        for source in execution["retrieved_sources"]:
+            if not isinstance(source, dict):
+                raise ValueError(f"Execution {query_id} contains an invalid source.")
+            citation = str(source.get("citation", "")).strip().upper()
+            if not citation or citation in citations:
+                raise ValueError(f"Execution {query_id} has a missing or duplicate citation ID.")
+            citations.add(citation)
         grounding = execution.get("grounding")
         if grounding is not None and not isinstance(grounding, dict):
             raise ValueError(f"Execution {query_id} grounding must be an object or null.")
+        if execution["used_llm"] and grounding is None:
+            raise ValueError(f"Execution {query_id} needs grounding when used_llm is true.")
         execution_by_id[query_id] = execution
 
     missing = set(case_by_id) - set(execution_by_id)
@@ -161,9 +171,12 @@ def evaluate_end_to_end(
         inconsistent = _non_negative_count(grounding, "inconsistent_supported_claim_count")
         verified_citation_claims = 0
         if grounding is not None:
+            claim_details = grounding.get("per_claim", [])
+            if not isinstance(claim_details, list) or len(claim_details) != claim_count:
+                raise ValueError(f"Execution {query_id} has invalid per_claim details.")
             verified_citation_claims = sum(
                 1
-                for claim in grounding.get("per_claim", [])
+                for claim in claim_details
                 if isinstance(claim, dict)
                 and claim.get("verdict") == "supported"
                 and bool(claim.get("cited_supporting_ids"))
