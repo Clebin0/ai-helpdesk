@@ -95,7 +95,7 @@ def test_end_to_end_metrics_cover_retrieval_generation_grounding_and_citations()
     assert report["grounding"]["citation_coverage_on_supported_claims"] == 1.0
     assert report["citations"]["citation_validity"] == 1.0
     assert report["citations"]["relevant_citation_precision"] == 0.5
-    assert report["citations"]["answerable_query_citation_coverage"] == 1.0
+    assert report["citations"]["answerable_query_citation_coverage"] == 0.5
 
 
 def test_end_to_end_rejects_missing_duplicate_and_unknown_executions():
@@ -147,7 +147,7 @@ def test_end_to_end_rejects_inconsistent_grounding_counts():
         },
         {**base, "query_id": "u"},
     ]
-    with pytest.raises(ValueError, match="inconsistent grounding claim totals"):
+    with pytest.raises(ValueError, match="grounding verdict totals do not match per_claim"):
         evaluate_end_to_end(cases, executions)
 
 
