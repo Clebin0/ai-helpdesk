@@ -180,3 +180,48 @@ def test_balanced_selection_includes_canonical_paraphrase_and_unanswerable():
     assert select_balanced_cases(cases, None) == cases
     with pytest.raises(ValueError):
         select_balanced_cases(cases, 0)
+
+
+def test_judge_failure_is_recorded_and_not_counted_as_safe_abstention():
+    cases = [
+        {"id": "answerable", "answerable": True, "expected_sources": ["dns.md"]},
+        {"id": "unsupported-with-context", "answerable": False, "expected_sources": []},
+        {"id": "unsupported-no-context", "answerable": False, "expected_sources": []},
+    ]
+    executions = [
+        {
+            "query_id": "answerable",
+            "answer": "Use nslookup [S1].",
+            "retrieved_sources": [{"citation": "S1", "source": "dns.md"}],
+            "used_llm": True,
+            "grounding": None,
+            "grounding_error": "ValueError: JSON incompleto",
+        },
+        {
+            "query_id": "unsupported-with-context",
+            "answer": "Use o procedimento de VPN [S1].",
+            "retrieved_sources": [{"citation": "S1", "source": "dns.md"}],
+            "used_llm": True,
+            "grounding": None,
+            "grounding_error": "ValueError: JSON incompleto",
+        },
+        {
+            "query_id": "unsupported-no-context",
+            "answer": "Não há informação suficiente na base.",
+            "retrieved_sources": [],
+            "used_llm": False,
+            "grounding": None,
+            "grounding_error": None,
+        },
+    ]
+
+    report = evaluate_end_to_end(cases, executions)
+
+    assert report["generation"]["grounding_evaluation_failure_count"] == 2
+    assert report["generation"]["unanswerable_grounding_evaluation_failures"] == 1
+    assert report["generation"]["grounding_evaluated_answer_count"] == 0
+    assert report["generation"]["grounding_evaluation_coverage"] == 0.0
+    assert report["generation"]["unanswerable_queries_without_factual_claims"] == 1
+    assert report["generation"]["unanswerable_safe_abstention_proxy_rate"] == 0.5
+    assert report["per_query"][1]["grounding_error"] == "ValueError: JSON incompleto"
+
