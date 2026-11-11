@@ -8,6 +8,7 @@ It is not a substitute for human review or a proof of factual correctness.
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Sequence
 from typing import Literal
@@ -144,8 +145,8 @@ def judge_answer_grounding(
         )
 
     llm = client or OllamaClient(
-        host=DEFAULT_HOST,
-        model=DEFAULT_MODEL,
+        host=os.getenv("OLLAMA_HOST", DEFAULT_HOST),
+        model=os.getenv("OLLAMA_MODEL", DEFAULT_MODEL),
     )
     raw = llm.chat(
         [
@@ -231,7 +232,8 @@ def summarize_grounding(
         )
 
     total = len(assessment.claims)
-    ratio = lambda value: round(value / total, 4) if total else 0.0
+    def ratio(value: int) -> float:
+        return round(value / total, 4) if total else 0.0
     citation_coverage = (
         round(cited_supported_claims / supported, 4) if supported else 0.0
     )
