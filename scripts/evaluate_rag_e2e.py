@@ -16,6 +16,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from rag_e2e_evaluation import evaluate_end_to_end, select_balanced_cases
+from hybrid_retrieval import rerank_hybrid
+from lexical_retrieval import FTS5Index, reciprocal_rank_fusion
 
 
 NO_CONTEXT_ANSWER = (
@@ -23,6 +25,78 @@ NO_CONTEXT_ANSWER = (
     "Não vou completar a resposta com suposições. Adicione documentação relevante "
     "ou reformule a pergunta."
 )
+
+
+def _build_lexical_index(
+    documents: list[dict[str, Any]],
+    assistant_core: Any,
+) -> FTS5Index:
+    """Build an in-memory FTS5 index from the exact chunks used by the RAG."""
+    chunks: list[dict[str, Any]] = []
+    for document in documents:
+        source = str(document["source"])
+        for chunk_index, chunk_content in enumerate(
+            assistant_core.chunk_text(str(document["content"]))
+        ):
+            chunks.append(
+                {
+                    "source": source,
+                    "chunk_index": chunk_index,
+                    "content": chunk_content,
+                }
+            )
+    return FTS5Index(chunks)
+
+
+def _retrieve_chunks(
+    question: str,
+    *,
+    assistant_core: Any,
+    args: argparse.Namespace,
+    minimum_relevance: float,
+    lexical_index: FTS5Index | None = None,
+) -> list[dict[str, Any]]:
+    """Retrieve chunks using the selected benchmark-only strategy."""
+    if args.retrieval_mode == "semantic":
+        return assistant_core.relevant_chunks(question, top_k=args.top_k)
+
+    dense_candidates = assistant_core.retrieve_chunks(
+        question,
+        top_k=args.rrf_candidate_depth,
+    )
+    vector_candidates = [
+        item
+        for item in rerank_hybrid(
+            question,
+            dense_candidates,
+            semantic_weight=args.hybrid_semantic_weight,
+            minimum_lexical_coverage=args.hybrid_min_lexical_coverage,
+            semantic_rescue_threshold=args.hybrid_semantic_rescue,
+        )
+        if float(item.get("score", 0.0)) >= minimum_relevance
+    ]
+
+    if args.retrieval_mode == "hybrid":
+        return vector_candidates[: args.top_k]
+
+    if args.retrieval_mode == "rrf":
+        if lexical_index is None:
+            raise RuntimeError("FTS5 index was not initialized for RRF mode.")
+        lexical_candidates = [
+            item
+            for item in lexical_index.search(
+                question,
+                limit=args.rrf_candidate_depth,
+            )
+            if float(item.get("bm25_score", 0.0)) <= args.rrf_bm25_cutoff
+        ]
+        return reciprocal_rank_fusion(
+            [vector_candidates, lexical_candidates],
+            rank_constant=args.rrf_rank_constant,
+            limit=args.top_k,
+        )
+
+    raise ValueError(f"Unsupported retrieval mode: {args.retrieval_mode}")
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -55,6 +129,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     os.environ["LLM_PROVIDER"] = "ollama"
     os.environ["RAG_EMBEDDING_PROVIDER"] = "local"
     os.environ["RAG_DB_PATH"] = str(args.db_path.resolve())
+    if args.min_relevance is not None:
+        os.environ["RAG_MIN_RELEVANCE"] = str(args.min_relevance)
+    minimum_relevance = float(os.getenv("RAG_MIN_RELEVANCE", "0.18"))
 
     ollama_base = (
         args.ollama_host
@@ -87,13 +164,24 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         indexing_seconds = time.perf_counter() - index_started
 
         client = OllamaClient(host=ollama_base, model=model, timeout=args.timeout)
+        lexical_index = (
+            _build_lexical_index(documents, assistant_core)
+            if args.retrieval_mode == "rrf"
+            else None
+        )
         executions: list[dict[str, Any]] = []
         generation_calls = 0
         judge_calls = 0
         judge_successes = 0
         for index, case in enumerate(selected_cases, start=1):
             question = str(case["question"])
-            retrieved = assistant_core.relevant_chunks(question, top_k=args.top_k)
+            retrieved = _retrieve_chunks(
+                question,
+                assistant_core=assistant_core,
+                args=args,
+                minimum_relevance=minimum_relevance,
+                lexical_index=lexical_index,
+            )
             sources = assistant_core.source_metadata(retrieved)
             grounding_report = None
             grounding_error = None
@@ -153,6 +241,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 file=sys.stderr,
             )
 
+        if lexical_index is not None:
+            lexical_index.close()
+
         report = evaluate_end_to_end(selected_cases, executions)
         report.update(
             {
@@ -164,7 +255,29 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "embedding_provider": "fastembed_local",
                 "embedding_model": assistant_core.embedding_model(),
                 "top_k": args.top_k,
-                "retrieval_min_relevance": float(os.getenv("RAG_MIN_RELEVANCE", "0.18")),
+                "retrieval_mode": args.retrieval_mode,
+                "retrieval_parameters": {
+                    "minimum_relevance": minimum_relevance,
+                    "hybrid": (
+                        {
+                            "semantic_weight": args.hybrid_semantic_weight,
+                            "minimum_lexical_coverage": args.hybrid_min_lexical_coverage,
+                            "semantic_rescue_threshold": args.hybrid_semantic_rescue,
+                        }
+                        if args.retrieval_mode in {"hybrid", "rrf"}
+                        else None
+                    ),
+                    "rrf": (
+                        {
+                            "rank_constant": args.rrf_rank_constant,
+                            "bm25_cutoff": args.rrf_bm25_cutoff,
+                            "candidate_depth": args.rrf_candidate_depth,
+                        }
+                        if args.retrieval_mode == "rrf"
+                        else None
+                    ),
+                },
+                "retrieval_min_relevance": minimum_relevance,
                 "indexing_seconds": round(indexing_seconds, 3),
                 "generation_calls": generation_calls,
                 "grounding_judge_calls": judge_calls,
@@ -208,6 +321,54 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--top-k", type=int, default=4, help="Trechos recuperados por pergunta (1 a 4).")
     parser.add_argument(
+        "--retrieval-mode",
+        choices=("semantic", "hybrid", "rrf"),
+        default="semantic",
+        help="semantic reproduz produção; hybrid reranqueia vetores; rrf combina vetores e BM25.",
+    )
+    parser.add_argument(
+        "--min-relevance",
+        type=float,
+        default=None,
+        help="Sobrescreve RAG_MIN_RELEVANCE apenas nesta execução (0 a 1).",
+    )
+    parser.add_argument(
+        "--hybrid-semantic-weight",
+        type=float,
+        default=0.80,
+        help="Peso do score semântico no reranking híbrido (0 a 1).",
+    )
+    parser.add_argument(
+        "--hybrid-min-lexical-coverage",
+        type=float,
+        default=0.10,
+        help="Cobertura lexical IDF mínima (0 a 1).",
+    )
+    parser.add_argument(
+        "--hybrid-semantic-rescue",
+        type=float,
+        default=0.55,
+        help="Score semântico mínimo para resgatar paráfrases com baixa cobertura lexical.",
+    )
+    parser.add_argument(
+        "--rrf-rank-constant",
+        type=int,
+        default=60,
+        help="Constante k da fusão RRF.",
+    )
+    parser.add_argument(
+        "--rrf-bm25-cutoff",
+        type=float,
+        default=-2.5,
+        help="Aceita candidatos BM25 apenas quando bm25 <= cutoff.",
+    )
+    parser.add_argument(
+        "--rrf-candidate-depth",
+        type=int,
+        default=8,
+        help="Profundidade das listas vetorial e BM25 antes da fusão (1 a 64).",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=6,
@@ -220,6 +381,20 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if not 1 <= args.top_k <= 4:
         parser.error("--top-k precisa ficar entre 1 e 4 para manter o orçamento do juiz de evidências.")
+    if args.min_relevance is not None and not 0 <= args.min_relevance <= 1:
+        parser.error("--min-relevance precisa ficar entre 0 e 1.")
+    if not 0 <= args.hybrid_semantic_weight <= 1:
+        parser.error("--hybrid-semantic-weight precisa ficar entre 0 e 1.")
+    if not 0 <= args.hybrid_min_lexical_coverage <= 1:
+        parser.error("--hybrid-min-lexical-coverage precisa ficar entre 0 e 1.")
+    if not 0 <= args.hybrid_semantic_rescue <= 1:
+        parser.error("--hybrid-semantic-rescue precisa ficar entre 0 e 1.")
+    if args.rrf_rank_constant < 1:
+        parser.error("--rrf-rank-constant precisa ser pelo menos 1.")
+    if not math.isfinite(args.rrf_bm25_cutoff):
+        parser.error("--rrf-bm25-cutoff precisa ser um número finito.")
+    if not 1 <= args.rrf_candidate_depth <= 64:
+        parser.error("--rrf-candidate-depth precisa ficar entre 1 e 64.")
     if args.limit < 3:
         parser.error("--limit precisa ser pelo menos 3 para incluir perguntas canônicas, paráfrases e sem resposta.")
     if args.timeout <= 0:
