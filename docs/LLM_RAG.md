@@ -171,6 +171,8 @@ Para avaliar respostas capturadas do assistente, prepare um JSON com `query_id`,
 
 A auditoria mede se os identificadores [S1], [S2] etc. existem nos metadados retornados e se apontam para fontes esperadas pelo benchmark. Ela **não prova que o trecho citado sustenta semanticamente cada afirmação**. Essa verificação exige revisão humana ou um protocolo de avaliação semântica separado.
 
+Para experimentar uma avaliação semântica auxiliar, o laboratório isolado inclui um juiz local em `examples/llm_foundations/grounding.py`. Ele divide a resposta em afirmações factuais, compara cada uma com os trechos fornecidos e classifica o suporte. Execute `python -m examples.llm_foundations.grounding_evaluation --input evaluation/grounding.example.json`. O juiz não participa do endpoint de produção, não usa conhecimento externo como evidência e não prova que uma afirmação é verdadeira. Como todo avaliador baseado em LLM, pode falhar; valide uma amostra manualmente e nunca trate a pontuação como certificação.
+
 O valor passado em `--min-relevance` vale apenas naquela execução. Compare Recall@K, Precision of returned, as métricas de abstenção e a quantidade de fontes retornadas; um corte alto demais pode remover uma fonte necessária. No benchmark v2, o modo semântico com 0.18 retornou fontes para as cinco consultas sem resposta. Aumentar o threshold até 0.55 bloqueou todas, mas reduziu o recall para 53,1%.
 
 Existe um reranker lexical experimental, acionado apenas por `--retrieval-mode hybrid`:
