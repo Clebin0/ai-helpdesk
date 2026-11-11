@@ -86,6 +86,14 @@ python scripts/evaluate_rag.py --retrieval-mode hybrid --top-k 4 --repeats 3 --m
 python scripts/evaluate_rag.py --retrieval-mode rrf --top-k 4 --repeats 3 --min-relevance 0.18 --rrf-bm25-cutoff -2.5
 ```
 
+Para avaliar o fluxo completo com geração local, fundamentação das afirmações e abstenção em perguntas sem resposta, execute primeiro a amostra balanceada:
+
+```bash
+python scripts/evaluate_rag_e2e.py
+# benchmark completo: 21 perguntas, somente Ollama e FastEmbed locais
+python scripts/evaluate_rag_e2e.py --limit 21 --output evaluation/results/e2e-latest.json
+```
+
 Para auditar citações de respostas capturadas, use o formato de `evaluation/answers.example.json` e passe o arquivo com `--answers`. A auditoria verifica integridade dos IDs e alinhamento com fontes esperadas; não substitui avaliação humana de suporte semântico. A avaliação v2 também mede a abstenção do retriever, não a qualidade textual da recusa do LLM. O modo hybrid é um reranker lexical experimental sobre candidatos vetoriais. O modo rrf adiciona busca BM25 independente com SQLite FTS5 e Reciprocal Rank Fusion; neste corpus, obteve 93,75% de Recall@4, 91,67% de Precision of returned e 5/5 abstenções corretas. Ambos permanecem fora do caminho de produção.
 
 Veja [docs/LLM_RAG.md](docs/LLM_RAG.md) para métricas, limitações e detalhes de execução. Os resultados medidos localmente estão em [evaluation/RESULTS.md](evaluation/RESULTS.md).
