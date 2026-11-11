@@ -185,6 +185,13 @@ Execute as 21 perguntas para a avaliação completa:
 
     python scripts/evaluate_rag_e2e.py --limit 21 --output evaluation/results/e2e-latest.json
 
+O avaliador end-to-end também permite comparar os retrievers sem alterar o endpoint de produção. O modo padrão `semantic` reproduz o fluxo atual. Para testar o reranker híbrido ou a fusão RRF com o mesmo Qwen, execute:
+
+    python scripts/evaluate_rag_e2e.py --retrieval-mode hybrid --limit 21 --output evaluation/results/e2e-hybrid.json
+    python scripts/evaluate_rag_e2e.py --retrieval-mode rrf --limit 21 --output evaluation/results/e2e-rrf.json
+
+Os modos `hybrid` e `rrf` são experimentais e existem apenas no runner de avaliação. Eles usam os mesmos parâmetros do benchmark de recuperação: peso semântico 0.80, cobertura lexical mínima 0.10, resgate semântico 0.55 e, no RRF, corte BM25 -2.5. Os valores podem ser ajustados por CLI; o relatório registra modo e parâmetros para permitir comparação reproduzível. O modo RRF cria um índice FTS5 em memória e separado da base do assistente. Compare cobertura, abstinência, suporte das afirmações e relevância das citações antes de considerar qualquer mudança no caminho de produção.
+
 O runner força `LLM_PROVIDER=ollama` e `RAG_EMBEDDING_PROVIDER=local`, independentemente da configuração de provedores no `.env`. Portanto, não usa créditos de APIs hospedadas. O Ollama precisa estar em execução e o modelo de chat disponível; a primeira indexação pode baixar o modelo FastEmbed. O SQLite padrão é `data/rag-e2e-benchmark.sqlite3`, separado tanto da base do assistente quanto do banco do benchmark de recuperação.
 
 O relatório separa quatro grupos: (1) cobertura da recuperação e abstenção do retriever; (2) quantidade de respostas geradas e proxy de abstenção em perguntas sem resposta; (3) proporção de afirmações `supported`, `unsupported` e `insufficient_evidence`; (4) integridade das citações e alinhamento com as fontes esperadas. O campo `unanswerable_safe_abstention_proxy_rate` conta respostas sem afirmações factuais identificadas, mas isso **não prova** que a recusa em linguagem natural esteja correta. O juiz continua sendo um LLM: seus vereditos exigem revisão humana.
