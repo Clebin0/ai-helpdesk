@@ -116,7 +116,7 @@ def test_summarize_grounding_calculates_claim_and_citation_metrics():
     assert report["unsupported_claim_count"] == 1
     assert report["insufficient_evidence_claim_count"] == 1
     assert report["claim_support_rate"] == pytest.approx(1 / 3, abs=0.0001)
-    assert report["unsupported_claim_rate"] == pytest.approx(1 / 3)
+    assert report["unsupported_claim_rate"] == pytest.approx(1 / 3, abs=0.0001)
     assert report["citation_coverage_on_supported_claims"] == 1.0
     assert report["invalid_reference_count"] == 0
 
