@@ -96,7 +96,7 @@ $env:OLLAMA_MODEL = "qwen3.5:4b-q4_K_M"
 Os testes usam respostas simuladas e não exigem que o Ollama esteja ativo:
 
 ```powershell
-python -m pytest tests/test_llm_foundations.py -q
+python -m pytest tests/test_llm_foundations.py tests/test_semantic_search.py -q
 ```
 
 ## Estrutura
@@ -107,8 +107,12 @@ examples/
     ollama_client.py      # cliente HTTP local e validação de entrada
     chat.py               # primeira chamada de chat
     ticket_analysis.py    # JSON Schema + validação Pydantic
+    embeddings.py         # embeddings locais com FastEmbed
+    semantic_search.py    # chunking, similaridade e citações
+    rag_search.py         # demonstração de recuperação
 tests/
-  test_llm_foundations.py # testes sem rede e sem inferência
+  test_llm_foundations.py # testes de cliente e saída estruturada
+  test_semantic_search.py # testes de vetores e recuperação
 ```
 
 ## Limites e segurança
