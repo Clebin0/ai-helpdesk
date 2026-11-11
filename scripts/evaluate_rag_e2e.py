@@ -90,11 +90,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         executions: list[dict[str, Any]] = []
         generation_calls = 0
         judge_calls = 0
+        judge_successes = 0
         for index, case in enumerate(selected_cases, start=1):
             question = str(case["question"])
             retrieved = assistant_core.relevant_chunks(question, top_k=args.top_k)
             sources = assistant_core.source_metadata(retrieved)
             grounding_report = None
+            grounding_error = None
             used_llm = bool(retrieved)
 
             if retrieved:
@@ -108,17 +110,28 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     }
                     for source_index, item in enumerate(retrieved, start=1)
                 ]
-                assessment = judge_answer_grounding(
-                    answer,
-                    evidence,
-                    client=client,
-                )
                 judge_calls += 1
-                grounding_report = summarize_grounding(
-                    answer,
-                    evidence,
-                    assessment,
-                )
+                try:
+                    assessment = judge_answer_grounding(
+                        answer,
+                        evidence,
+                        client=client,
+                    )
+                    grounding_report = summarize_grounding(
+                        answer,
+                        evidence,
+                        assessment,
+                    )
+                    judge_successes += 1
+                except (RuntimeError, ValueError) as exc:
+                    # Keep the generated answer in the report; an invalid judge
+                    # response is an unknown evaluation, never positive evidence.
+                    grounding_error = f"{type(exc).__name__}: {str(exc)[:300]}"
+                    print(
+                        f"[{index}/{len(selected_cases)}] aviso: "
+                        f"falha na avaliação de fundamentação: {grounding_error}",
+                        file=sys.stderr,
+                    )
             else:
                 answer = NO_CONTEXT_ANSWER
 
@@ -129,12 +142,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     "retrieved_sources": sources,
                     "used_llm": used_llm,
                     "grounding": grounding_report,
+                    "grounding_error": grounding_error,
                 }
             )
             print(
                 f"[{index}/{len(selected_cases)}] {case['id']}: "
                 f"{len(retrieved)} trecho(s), "
-                f"{'com geração local' if used_llm else 'abstenção sem contexto'}",
+                f"{'com geração local' if used_llm else 'abstenção sem contexto'}, "
+                f"{'juiz avaliado' if grounding_report is not None else ('juiz falhou' if grounding_error else 'sem juiz necessário')}",
                 file=sys.stderr,
             )
 
@@ -153,6 +168,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "indexing_seconds": round(indexing_seconds, 3),
                 "generation_calls": generation_calls,
                 "grounding_judge_calls": judge_calls,
+                "grounding_judge_successes": judge_successes,
+                "grounding_judge_failures": judge_calls - judge_successes,
                 "selected_query_ids": [str(case["id"]) for case in selected_cases],
                 "database_path": str(args.db_path.resolve()),
             }
