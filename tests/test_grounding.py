@@ -106,7 +106,7 @@ def test_summarize_grounding_calculates_claim_and_citation_metrics():
     )
 
     report = summarize_grounding(
-        "Use ipconfig /all [S1]. O procedimento exige formatar o computador [S1].",
+        "ipconfig /all mostra os servidores DNS configurados [S1]. O procedimento exige formatar o computador [S1].",
         sources(),
         assessment,
     )
