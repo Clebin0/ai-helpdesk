@@ -13,16 +13,30 @@ def _grounding(
     insufficient: int = 0,
     cited: bool = False,
 ) -> dict:
+    per_claim = []
+    for index in range(claims):
+        if index < supported:
+            per_claim.append(
+                {
+                    "verdict": "supported",
+                    "cited_supporting_ids": ["S1"] if cited else [],
+                }
+            )
+        elif index < supported + unsupported:
+            per_claim.append(
+                {"verdict": "unsupported", "cited_supporting_ids": []}
+            )
+        else:
+            per_claim.append(
+                {"verdict": "insufficient_evidence", "cited_supporting_ids": []}
+            )
     return {
         "claim_count": claims,
         "supported_claim_count": supported,
         "unsupported_claim_count": unsupported,
         "insufficient_evidence_claim_count": insufficient,
         "inconsistent_supported_claim_count": 0,
-        "per_claim": (
-            [{"verdict": "supported", "cited_supporting_ids": ["S1"]}]
-            if cited else []
-        ),
+        "per_claim": per_claim,
     }
 
 
