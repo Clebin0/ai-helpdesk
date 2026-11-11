@@ -401,3 +401,36 @@ def test_judge_reports_failure_after_two_invalid_structured_responses():
 
     assert len(client.calls) == 2
 
+
+def test_blank_only_support_ids_downgrade_supported_claim_to_insufficient():
+    client = FakeClient(
+        {
+            "claims": [
+                {
+                    "claim": "O serviço está disponível.",
+                    "verdict": "supported",
+                    "answer_citation_ids": ["S1"],
+                    "supporting_source_ids": ["", "  "],
+                    "rationale": "O juiz não retornou IDs de evidência.",
+                }
+            ],
+            "limitations": [],
+        }
+    )
+
+    assessment = judge_answer_grounding(
+        "O serviço está disponível [S1].",
+        sources(),
+        client=client,
+    )
+    report = summarize_grounding(
+        "O serviço está disponível [S1].",
+        sources(),
+        assessment,
+    )
+
+    assert report["per_claim"][0]["judge_verdict"] == "supported"
+    assert report["per_claim"][0]["verdict"] == "insufficient_evidence"
+    assert report["per_claim"][0]["supporting_source_ids"] == []
+    assert report["inconsistent_supported_claim_count"] == 1
+    assert any("ID vazio" in item for item in report["limitations"])
