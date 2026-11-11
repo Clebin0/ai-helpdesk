@@ -60,6 +60,28 @@ python -m examples.llm_foundations.ticket_analysis "Usuários do escritório nã
 
 O programa pede ao Ollama um objeto JSON compatível com o schema de `TicketAnalysis` e valida o resultado. JSON válido não significa análise correta: confira categoria, prioridade e ação sugerida antes de usar a informação.
 
+### 3. Embeddings e busca semântica
+
+```powershell
+python -m examples.llm_foundations.rag_search "Alguns computadores não conseguem encontrar os servidores pelo nome."
+```
+
+O comando gera embeddings locais para os documentos sintéticos e para a pergunta, compara os vetores por similaridade de cosseno e mostra os trechos recuperados com fonte e índice. A primeira execução pode baixar o modelo de embeddings. Esta etapa é apenas recuperação: ela ainda não chama o LLM para redigir uma resposta.
+
+```text
+Documentos → chunks → embeddings → índice
+                                   ↑
+Pergunta → embedding → similaridade → fontes recuperadas
+```
+
+Parâmetros opcionais:
+
+```powershell
+python -m examples.llm_foundations.rag_search "falha de DNS" --top-k 2 --min-score 0.25
+```
+
+O limite de similaridade não é uma probabilidade de acerto. Ajuste-o com perguntas de avaliação e confira as fontes recuperadas.
+
 ### Configuração opcional
 
 O padrão é `http://127.0.0.1:11434` e `qwen3.5:4b-q4_K_M`. Para alterar sem editar o código:
