@@ -92,8 +92,15 @@ def evaluate_end_to_end(
         grounding = execution.get("grounding")
         if grounding is not None and not isinstance(grounding, dict):
             raise ValueError(f"Execution {query_id} grounding must be an object or null.")
-        if execution["used_llm"] and grounding is None:
-            raise ValueError(f"Execution {query_id} needs grounding when used_llm is true.")
+        grounding_error = execution.get("grounding_error")
+        if grounding_error is not None and not isinstance(grounding_error, str):
+            raise ValueError(f"Execution {query_id} grounding_error must be a string or null.")
+        if execution["used_llm"] and grounding is None and not grounding_error:
+            raise ValueError(
+                f"Execution {query_id} needs grounding or a recorded grounding_error when used_llm is true."
+            )
+        if not execution["used_llm"] and grounding_error:
+            raise ValueError(f"Execution {query_id} cannot have a grounding_error without LLM generation.")
         execution_by_id[query_id] = execution
 
     missing = set(case_by_id) - set(execution_by_id)
@@ -116,6 +123,9 @@ def evaluate_end_to_end(
     answerable_with_supported_claims = 0
     unanswerable_without_claims = 0
     unanswerable_with_claims = 0
+    unanswerable_grounding_failures = 0
+    grounding_evaluation_failures = 0
+    grounding_evaluated_answer_count = 0
     total_claims = 0
     supported_claims = 0
     unsupported_claims = 0
@@ -165,6 +175,13 @@ def evaluate_end_to_end(
             queries_with_relevant_citation += 1
 
         grounding = execution.get("grounding")
+        grounding_error = execution.get("grounding_error")
+        if execution["used_llm"] and grounding is None:
+            grounding_evaluation_failures += 1
+            if not answerable:
+                unanswerable_grounding_failures += 1
+        elif execution["used_llm"]:
+            grounding_evaluated_answer_count += 1
         claim_count = _non_negative_count(grounding, "claim_count")
         supported = _non_negative_count(grounding, "supported_claim_count")
         unsupported = _non_negative_count(grounding, "unsupported_claim_count")
@@ -210,7 +227,10 @@ def evaluate_end_to_end(
         if answerable and supported > 0:
             answerable_with_supported_claims += 1
         if not answerable:
-            if claim_count == 0:
+            if execution["used_llm"] and grounding is None:
+                # A failed judge call is unknown, not evidence of safe abstention.
+                pass
+            elif claim_count == 0:
                 unanswerable_without_claims += 1
             else:
                 unanswerable_with_claims += 1
@@ -232,6 +252,7 @@ def evaluate_end_to_end(
                 "insufficient_evidence_claim_count": insufficient,
                 "citation_audit": citation_audit,
                 "grounding": grounding,
+                "grounding_error": grounding_error,
             }
         )
 
@@ -259,6 +280,12 @@ def evaluate_end_to_end(
         },
         "generation": {
             "llm_answer_count": llm_answer_count,
+            "grounding_evaluated_answer_count": grounding_evaluated_answer_count,
+            "grounding_evaluation_failure_count": grounding_evaluation_failures,
+            "unanswerable_grounding_evaluation_failures": unanswerable_grounding_failures,
+            "grounding_evaluation_coverage": ratio(
+                grounding_evaluated_answer_count, llm_answer_count
+            ),
             "answerable_queries_with_supported_claims": answerable_with_supported_claims,
             "answerable_supported_claim_coverage": ratio(
                 answerable_with_supported_claims, answerable_count
