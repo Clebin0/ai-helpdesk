@@ -254,3 +254,82 @@ def test_summarize_accepts_empty_claim_list_without_division_error():
 def test_summarize_rejects_invalid_assessment_payload():
     with pytest.raises(ValueError, match="Avaliação estruturada inválida"):
         summarize_grounding("Resposta.", sources(), {"claims": [{"verdict": "maybe"}]})
+
+
+def test_summarize_recovers_citations_from_the_matching_answer_sentence():
+    answer = (
+        "Execute ipconfig /all para conferir os servidores DNS configurados [S1]. "
+        "Depois, use nslookup exemplo.com para testar a resolução de nomes [S1]. "
+        "Se o IP responde, mas os nomes não resolvem, investigue DNS [S2]. "
+        "O comando ipconfig /flushdns reinicia o roteador [S1]."
+    )
+    assessment = GroundingAssessment(
+        claims=[
+            ClaimAssessment(
+                claim="Execute ipconfig /all para conferir os servidores DNS configurados.",
+                verdict="supported",
+                answer_citation_ids=[],
+                supporting_source_ids=["S1"],
+                rationale="A fonte descreve o comando.",
+            ),
+            ClaimAssessment(
+                claim="Depois, use nslookup exemplo.com para testar a resolução de nomes.",
+                verdict="supported",
+                answer_citation_ids=[],
+                supporting_source_ids=["S1"],
+                rationale="A fonte descreve o teste.",
+            ),
+            ClaimAssessment(
+                claim="Se o IP responde, mas os nomes não resolvem, investigue DNS.",
+                verdict="supported",
+                answer_citation_ids=[],
+                supporting_source_ids=["S2"],
+                rationale="A fonte descreve esse diagnóstico.",
+            ),
+            ClaimAssessment(
+                claim="O comando ipconfig /flushdns reinicia o roteador.",
+                verdict="unsupported",
+                answer_citation_ids=[],
+                supporting_source_ids=[],
+                rationale="A fonte informa que o comando limpa o cache DNS local.",
+            ),
+        ]
+    )
+
+    report = summarize_grounding(answer, sources(), assessment)
+
+    assert report["citation_coverage_on_supported_claims"] == 1.0
+    assert report["unassigned_answer_citation_ids"] == []
+    assert [claim["answer_citation_ids"] for claim in report["per_claim"]] == [
+        ["S1"],
+        ["S1"],
+        ["S2"],
+        ["S1"],
+    ]
+    assert all(claim["answer_text_match"] for claim in report["per_claim"])
+
+
+def test_judge_citation_from_another_sentence_is_not_counted_as_verified():
+    answer = "A estação usa DNS interno [S1]. O gateway responde normalmente [S2]."
+    assessment = GroundingAssessment(
+        claims=[
+            ClaimAssessment(
+                claim="O roteador reinicia automaticamente quando a estação perde DNS.",
+                verdict="supported",
+                answer_citation_ids=["S1"],
+                supporting_source_ids=["S1"],
+                rationale="Associação fornecida pelo juiz, mas sem trecho correspondente.",
+            )
+        ]
+    )
+
+    report = summarize_grounding(answer, sources(), assessment)
+    claim = report["per_claim"][0]
+
+    assert report["citation_coverage_on_supported_claims"] == 0.0
+    assert claim["answer_text_match"] is False
+    assert claim["answer_citation_ids"] == []
+    assert claim["judge_answer_citation_ids"] == ["S1"]
+    assert claim["unverified_judge_answer_citation_ids"] == ["S1"]
+    assert report["unassigned_answer_citation_ids"] == ["S1", "S2"]
+
