@@ -186,3 +186,35 @@ def test_retriever_validates_min_score(min_score):
     )
     with pytest.raises(ValueError):
         retriever.search("DNS", min_score=min_score)
+
+
+
+def test_retriever_batches_large_indexes():
+    class CountingEmbedder:
+        def __init__(self):
+            self.batch_sizes = []
+
+        def embed(self, texts):
+            self.batch_sizes.append(len(texts))
+            return [[1.0, 0.0] for _ in texts]
+
+    embedder = CountingEmbedder()
+    documents = [
+        KnowledgeDocument(
+            source=f"document-{index}.md",
+            content=f"Documento sintético de suporte número {index}.",
+        )
+        for index in range(130)
+    ]
+
+    retriever = SemanticRetriever(documents, embedder)
+    results = retriever.search("Documento de suporte")
+
+    assert retriever.chunk_count == 130
+    assert embedder.batch_sizes == [128, 2, 1]
+    assert len(results) == 4
+
+
+def test_retriever_rejects_non_document_items():
+    with pytest.raises(ValueError, match="KnowledgeDocument"):
+        SemanticRetriever(["texto sem metadados"], FakeEmbedder())
