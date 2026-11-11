@@ -1,0 +1,15 @@
+{
+  "answer": "Execute ipconfig /all para conferir os servidores DNS configurados [S1]. Depois, use nslookup exemplo.com para testar a resolução de nomes [S1]. Se o IP responde, mas os nomes não resolvem, investigue DNS [S2]. O comando ipconfig /flushdns reinicia o roteador [S1].",
+  "sources": [
+    {
+      "citation": "S1",
+      "source": "dns-resolution.md",
+      "content": "Diagnóstico de resolução DNS no Windows. Execute ipconfig /all para conferir os servidores DNS configurados. Use nslookup exemplo.com para testar a resolução de nomes. Compare o resultado com outro resolvedor aprovado. ipconfig /flushdns limpa o cache DNS local."
+    },
+    {
+      "citation": "S2",
+      "source": "network-gateway.md",
+      "content": "Diagnóstico de conectividade de rede. Execute ipconfig para identificar o gateway padrão. Teste ping no gateway e depois um endereço IP externo autorizado. Se o IP responde mas nomes não resolvem, investigue DNS. Registre perda de pacotes, latência e interfaces afetadas."
+    }
+  ]
+}
