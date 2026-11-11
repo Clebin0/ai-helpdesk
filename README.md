@@ -123,6 +123,8 @@ O diretório [examples/llm_foundations](examples/llm_foundations/README.md) reú
 - Cliente HTTP para Ollama com validação de entrada, timeout e limite de resposta.
 - Chat completion com mensagens `system` e `user`.
 - Saída estruturada com JSON Schema e validação Pydantic.
-- Testes automatizados com respostas simuladas, sem inferência ou rede.
+- Embeddings multilíngues locais com FastEmbed.
+- Busca semântica por similaridade de cosseno, com trechos e citações de origem.
+- Testes automatizados com respostas e embeddings simulados, sem inferência ou rede.
 
-O laboratório usa o modelo local configurado no Ollama. As saídas são sugestões e precisam ser validadas; os exemplos não executam ações em sistemas.
+O laboratório usa Ollama e FastEmbed localmente. A busca semântica recupera evidências, mas similaridade não é uma probabilidade de acerto. As saídas são sugestões e precisam ser validadas; os exemplos não executam ações em sistemas.
