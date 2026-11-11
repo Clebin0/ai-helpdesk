@@ -6,7 +6,12 @@ import math
 from dataclasses import dataclass
 from typing import Sequence
 
-from .embeddings import EmbeddingError, TextEmbedder, validate_vectors
+from .embeddings import (
+    MAX_BATCH_SIZE,
+    EmbeddingError,
+    TextEmbedder,
+    validate_vectors,
+)
 
 MAX_QUERY_CHARS = 4_000
 MAX_TOP_K = 20
@@ -121,8 +126,14 @@ class SemanticRetriever:
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         overlap: int = DEFAULT_CHUNK_OVERLAP,
     ) -> None:
-        if isinstance(documents, (str, bytes)) or not documents:
-            raise ValueError("Informe pelo menos um documento.")
+        if (
+            isinstance(documents, (str, bytes))
+            or not isinstance(documents, Sequence)
+            or not documents
+        ):
+            raise ValueError("Informe uma sequência com pelo menos um documento.")
+        if not all(isinstance(document, KnowledgeDocument) for document in documents):
+            raise ValueError("Todos os itens precisam ser KnowledgeDocument.")
         sources = [document.source.strip() for document in documents]
         if len(set(sources)) != len(sources):
             raise ValueError("Cada documento precisa ter um source único.")
@@ -147,7 +158,16 @@ class SemanticRetriever:
         if not chunks:
             raise ValueError("Não há trechos de texto para indexar.")
 
-        vectors = embedder.embed([chunk.content for chunk in chunks])
+        vectors: list[list[float]] = []
+        for offset in range(0, len(chunks), MAX_BATCH_SIZE):
+            batch_texts = [
+                chunk.content
+                for chunk in chunks[offset : offset + MAX_BATCH_SIZE]
+            ]
+            batch_vectors = embedder.embed(batch_texts)
+            vectors.extend(
+                validate_vectors(batch_vectors, expected_count=len(batch_texts))
+            )
         self._vectors = validate_vectors(vectors, expected_count=len(chunks))
         self._chunks = tuple(chunks)
 
