@@ -125,6 +125,7 @@ O diretório [examples/llm_foundations](examples/llm_foundations/README.md) reú
 - Saída estruturada com JSON Schema e validação Pydantic.
 - Embeddings multilíngues locais com FastEmbed.
 - Busca semântica por similaridade de cosseno, com trechos e citações de origem.
+- Auditoria experimental, com LLM local, de afirmações sustentadas, não sustentadas ou sem evidência suficiente.
 - Testes automatizados com respostas e embeddings simulados, sem inferência ou rede.
 
 O laboratório usa Ollama e FastEmbed localmente. A busca semântica recupera evidências, mas similaridade não é uma probabilidade de acerto. As saídas são sugestões e precisam ser validadas; os exemplos não executam ações em sistemas.
