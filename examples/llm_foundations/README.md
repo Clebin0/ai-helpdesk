@@ -85,7 +85,7 @@ O limite de similaridade não é uma probabilidade de acerto. Ajuste-o com pergu
 
 ### 4. Auditoria de fundamentação da resposta
 
-A auditoria por LLM verifica afirmações factuais da resposta contra os trechos recuperados. Cada afirmação recebe um dos rótulos: `supported`, `unsupported` ou `insufficient_evidence`. O relatório também confere os IDs citados, identifica fontes inventadas e calcula taxa de suporte e cobertura de citações.
+A auditoria por LLM verifica afirmações factuais da resposta contra os trechos recuperados. Cada afirmação recebe um dos rótulos: `supported`, `unsupported` ou `insufficient_evidence`. A associação das citações é conferida pelo texto: o avaliador procura a redação normalizada exata da afirmação na mesma frase da resposta e só conta IDs citados nessa frase. Os IDs sugeridos pelo juiz também aparecem no relatório para diagnóstico, mas não aumentam a cobertura sem essa correspondência. Paráfrases sem correspondência exata ficam sem citação verificada, em vez de receber uma referência potencialmente incorreta. O relatório também identifica fontes inventadas e calcula taxa de suporte e cobertura de citações.
 
 Execute com o exemplo sintético:
 
