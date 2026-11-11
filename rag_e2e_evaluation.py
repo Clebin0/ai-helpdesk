@@ -159,7 +159,8 @@ def evaluate_end_to_end(
         relevant_citations += round(
             citation_audit["relevant_citation_precision"] * citation_audit["citation_count"]
         )
-        relevant_source_recalls.append(citation_audit["relevant_source_recall"])
+        if answerable:
+            relevant_source_recalls.append(citation_audit["relevant_source_recall"])
         if answerable and citation_audit["has_relevant_citation"]:
             queries_with_relevant_citation += 1
 
@@ -174,13 +175,26 @@ def evaluate_end_to_end(
             claim_details = grounding.get("per_claim", [])
             if not isinstance(claim_details, list) or len(claim_details) != claim_count:
                 raise ValueError(f"Execution {query_id} has invalid per_claim details.")
-            verified_citation_claims = sum(
-                1
-                for claim in claim_details
-                if isinstance(claim, dict)
-                and claim.get("verdict") == "supported"
-                and bool(claim.get("cited_supporting_ids"))
-            )
+            verdict_counts = {
+                "supported": 0,
+                "unsupported": 0,
+                "insufficient_evidence": 0,
+            }
+            for claim in claim_details:
+                if not isinstance(claim, dict) or claim.get("verdict") not in verdict_counts:
+                    raise ValueError(f"Execution {query_id} has an invalid claim verdict.")
+                verdict_counts[claim["verdict"]] += 1
+                if (
+                    claim.get("verdict") == "supported"
+                    and bool(claim.get("cited_supporting_ids"))
+                ):
+                    verified_citation_claims += 1
+            if (
+                verdict_counts["supported"] != supported
+                or verdict_counts["unsupported"] != unsupported
+                or verdict_counts["insufficient_evidence"] != insufficient
+            ):
+                raise ValueError(f"Execution {query_id} grounding verdict totals do not match per_claim.")
         if supported + unsupported + insufficient != claim_count:
             raise ValueError(f"Execution {query_id} has inconsistent grounding claim totals.")
 
