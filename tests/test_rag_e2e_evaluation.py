@@ -147,7 +147,7 @@ def test_end_to_end_rejects_inconsistent_grounding_counts():
         },
         {**base, "query_id": "u"},
     ]
-    with pytest.raises(ValueError, match="verdict totals do not match"):
+    with pytest.raises(ValueError, match="inconsistent grounding claim totals"):
         evaluate_end_to_end(cases, executions)
 
 
