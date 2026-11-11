@@ -157,12 +157,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "database_path": str(args.db_path.resolve()),
             }
         )
-    except (OSError, RuntimeError, ValueError, KeyError) as exc:
-        raise SystemExit(f"Falha na avaliação end-to-end: {exc}") from exc
     except Exception as exc:
-        if exc.__class__.__name__ in {"OllamaError", "ValidationError"}:
-            raise SystemExit(f"Falha na avaliação end-to-end: {exc}") from exc
-        raise
+        raise SystemExit(f"Falha na avaliação end-to-end: {exc}") from exc
 
     serialized = json.dumps(report, ensure_ascii=False, indent=2)
     if args.output:
@@ -207,8 +203,8 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if not 1 <= args.top_k <= 8:
         parser.error("--top-k precisa ficar entre 1 e 8.")
-    if args.limit < 2:
-        parser.error("--limit precisa ser pelo menos 2 para incluir ambos os tipos de pergunta.")
+    if args.limit < 3:
+        parser.error("--limit precisa ser pelo menos 3 para incluir perguntas canônicas, paráfrases e sem resposta.")
     if args.timeout <= 0:
         parser.error("--timeout precisa ser maior que zero.")
     return args
