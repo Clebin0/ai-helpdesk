@@ -189,7 +189,7 @@ O runner força `LLM_PROVIDER=ollama` e `RAG_EMBEDDING_PROVIDER=local`, independ
 
 O relatório separa quatro grupos: (1) cobertura da recuperação e abstenção do retriever; (2) quantidade de respostas geradas e proxy de abstenção em perguntas sem resposta; (3) proporção de afirmações `supported`, `unsupported` e `insufficient_evidence`; (4) integridade das citações e alinhamento com as fontes esperadas. O campo `unanswerable_safe_abstention_proxy_rate` conta respostas sem afirmações factuais identificadas, mas isso **não prova** que a recusa em linguagem natural esteja correta. O juiz continua sendo um LLM: seus vereditos exigem revisão humana.
 
-A amostra padrão reduz o número de chamadas locais durante o primeiro teste. `--limit 21` executa todas as perguntas. `--top-k` pode variar de 1 a 8. O relatório inclui a resposta gerada por consulta para permitir inspeção e comparação.
+A amostra padrão reduz o número de chamadas locais durante o primeiro teste. `--limit 21` executa todas as perguntas. `--top-k` pode variar de 1 a 4 para manter o orçamento de contexto do juiz de evidências. O relatório inclui a resposta gerada por consulta para permitir inspeção e comparação.
 
 O valor passado em `--min-relevance` vale apenas naquela execução. Compare Recall@K, Precision of returned, as métricas de abstenção e a quantidade de fontes retornadas; um corte alto demais pode remover uma fonte necessária. No benchmark v2, o modo semântico com 0.18 retornou fontes para as cinco consultas sem resposta. Aumentar o threshold até 0.55 bloqueou todas, mas reduziu o recall para 53,1%.
 
