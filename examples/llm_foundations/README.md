@@ -82,6 +82,20 @@ python -m examples.llm_foundations.rag_search "falha de DNS" --top-k 2 --min-sco
 
 O limite de similaridade não é uma probabilidade de acerto. Ajuste-o com perguntas de avaliação e confira as fontes recuperadas.
 
+
+### 4. Auditoria de fundamentação da resposta
+
+A auditoria por LLM verifica afirmações factuais da resposta contra os trechos recuperados. Cada afirmação recebe um dos rótulos: `supported`, `unsupported` ou `insufficient_evidence`. O relatório também confere os IDs citados, identifica fontes inventadas e calcula taxa de suporte e cobertura de citações.
+
+Execute com o exemplo sintético:
+
+```powershell
+python -m examples.llm_foundations.grounding_evaluation --input evaluation/grounding.example.json
+```
+
+O juiz usa o Ollama local com saída estruturada validada por Pydantic. Não usa API paga. O exemplo contém uma afirmação propositalmente incorreta para demonstrar a auditoria. A avaliação é uma estimativa do próprio LLM: pode errar, não prova verdade factual e exige revisão humana. Esse laboratório não modifica o caminho de chat do assistente em produção.
+
+
 ### Configuração opcional
 
 O padrão é `http://127.0.0.1:11434` e `qwen3.5:4b-q4_K_M`. Para alterar sem editar o código:
@@ -96,7 +110,7 @@ $env:OLLAMA_MODEL = "qwen3.5:4b-q4_K_M"
 Os testes usam respostas simuladas e não exigem que o Ollama esteja ativo:
 
 ```powershell
-python -m pytest tests/test_llm_foundations.py tests/test_semantic_search.py -q
+python -m pytest tests/test_llm_foundations.py tests/test_semantic_search.py tests/test_grounding.py -q
 ```
 
 ## Estrutura
@@ -110,9 +124,12 @@ examples/
     embeddings.py         # embeddings locais com FastEmbed
     semantic_search.py    # chunking, similaridade e citações
     rag_search.py         # demonstração de recuperação
+    grounding.py          # auditor de afirmações contra evidências
+    grounding_evaluation.py # CLI para avaliar uma resposta capturada
 tests/
   test_llm_foundations.py # testes de cliente e saída estruturada
   test_semantic_search.py # testes de vetores e recuperação
+  test_grounding.py       # testes do avaliador de fundamentação
 ```
 
 ## Limites e segurança
