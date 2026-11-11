@@ -86,6 +86,8 @@ python scripts/evaluate_rag.py --retrieval-mode hybrid --top-k 4 --repeats 3 --m
 python scripts/evaluate_rag.py --retrieval-mode rrf --top-k 4 --repeats 3 --min-relevance 0.18 --rrf-bm25-cutoff -2.5
 ```
 
+O avaliador local tenta novamente saídas JSON truncadas, descarta IDs de fonte vazios/malformados com aviso e continua o benchmark se a etapa de juiz falhar; essas falhas ficam explícitas no relatório, sem serem tratadas como abstenção segura.
+
 Para avaliar o fluxo completo com geração local, fundamentação das afirmações e abstenção em perguntas sem resposta, execute primeiro a amostra balanceada:
 
 ```bash
