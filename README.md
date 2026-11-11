@@ -139,3 +139,9 @@ O diretório [examples/llm_foundations](examples/llm_foundations/README.md) reú
 - Testes automatizados com respostas e embeddings simulados, sem inferência ou rede.
 
 O laboratório usa Ollama e FastEmbed localmente. A busca semântica recupera evidências, mas similaridade não é uma probabilidade de acerto. As saídas são sugestões e precisam ser validadas; os exemplos não executam ações em sistemas.
+
+## Multi-agent Assistant (experimental)
+
+The repository includes an initial, in-process multi-agent workflow that combines the existing deterministic ticket triage and LLM/RAG knowledge assistant. It exposes an authenticated, read-only endpoint at `POST /agents/assist`. The workflow includes a coordinator, triage specialist, knowledge specialist, and structural citation-integrity reviewer. It has no shell, arbitrary network, filesystem, ticket-write, or infrastructure-remediation tools.
+
+See [docs/AGENT_RUNTIME.md](docs/AGENT_RUNTIME.md) for request examples, the response contract, security boundaries, and test commands. Citation-ID checking is not semantic grounding; missing or unknown citation references are escalated for human review.
