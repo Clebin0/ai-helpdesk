@@ -76,7 +76,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             judge_answer_grounding,
             summarize_grounding,
         )
-        from examples.llm_foundations.ollama_client import OllamaClient, OllamaError
+        from examples.llm_foundations.ollama_client import OllamaClient
 
         index_started = time.perf_counter()
         for document in documents:
@@ -189,7 +189,7 @@ def parse_args() -> argparse.Namespace:
         default=ROOT / "data" / "rag-e2e-benchmark.sqlite3",
         help="SQLite isolado; não modifica a base do assistente.",
     )
-    parser.add_argument("--top-k", type=int, default=4, help="Trechos recuperados por pergunta (1 a 8).")
+    parser.add_argument("--top-k", type=int, default=4, help="Trechos recuperados por pergunta (1 a 4).")
     parser.add_argument(
         "--limit",
         type=int,
@@ -201,8 +201,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=float, default=180.0, help="Timeout de cada avaliação do juiz.")
     parser.add_argument("--output", type=Path, help="Salvar relatório JSON.")
     args = parser.parse_args()
-    if not 1 <= args.top_k <= 8:
-        parser.error("--top-k precisa ficar entre 1 e 8.")
+    if not 1 <= args.top_k <= 4:
+        parser.error("--top-k precisa ficar entre 1 e 4 para manter o orçamento do juiz de evidências.")
     if args.limit < 3:
         parser.error("--limit precisa ser pelo menos 3 para incluir perguntas canônicas, paráfrases e sem resposta.")
     if args.timeout <= 0:
