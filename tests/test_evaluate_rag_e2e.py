@@ -137,3 +137,41 @@ def test_rrf_mode_requires_its_lexical_index():
             args=_args("rrf"),
             minimum_relevance=0.18,
         )
+
+
+
+def test_parse_args_accepts_rrf_configuration(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "evaluate_rag_e2e.py",
+            "--retrieval-mode",
+            "rrf",
+            "--rrf-bm25-cutoff",
+            "-2.5",
+            "--limit",
+            "21",
+        ],
+    )
+
+    args = runner.parse_args()
+
+    assert args.retrieval_mode == "rrf"
+    assert args.rrf_bm25_cutoff == -2.5
+    assert args.limit == 21
+
+
+def test_parse_args_rejects_non_finite_rrf_cutoff(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "evaluate_rag_e2e.py",
+            "--retrieval-mode",
+            "rrf",
+            "--rrf-bm25-cutoff",
+            "nan",
+        ],
+    )
+
+    with pytest.raises(SystemExit):
+        runner.parse_args()
