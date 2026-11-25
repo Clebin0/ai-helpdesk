@@ -129,6 +129,7 @@ def store_document(
     if len(chunks) != len(vectors):
         raise ValueError("The number of text chunks and embeddings must match.")
     _validate_vectors(vectors)
+    created_at_value = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
 
     with _connection() as connection:
         connection.execute(
@@ -150,7 +151,7 @@ def store_document(
                     Vector(vector),
                     model,
                     digest,
-                    created_at,
+                    created_at_value,
                 )
                 for index, (chunk, vector) in enumerate(zip(chunks, vectors))
             ],
