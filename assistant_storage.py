@@ -32,7 +32,7 @@ def _database_url() -> str:
     return url
 
 
-def _raw_connection():
+def _raw_connection(*, register_types: bool = True):
     try:
         import psycopg
         from pgvector.psycopg import register_vector
@@ -47,7 +47,8 @@ def _raw_connection():
         connect_timeout=int(os.getenv("POSTGRES_CONNECT_TIMEOUT", "5")),
         row_factory=dict_row,
     )
-    register_vector(connection)
+    if register_types:
+        register_vector(connection)
     return connection
 
 
@@ -67,7 +68,7 @@ def _ensure_schema() -> None:
         if not migration_file.is_file():
             raise RuntimeError(f"Database migration not found: {migration_file}")
 
-        with _raw_connection() as connection:
+        with _raw_connection(register_types=False) as connection:
             connection.execute("CREATE EXTENSION IF NOT EXISTS vector")
             connection.execute(
                 """
