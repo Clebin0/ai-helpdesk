@@ -133,6 +133,7 @@ def assistant_health():
         "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
         "embedding_provider": assistant_core.embedding_provider(),
         "embedding_model": assistant_core.embedding_model(),
+        "storage_backend": assistant_core.storage_backend(),
         "chat_access_configured": bool(os.getenv("ASSISTANT_ACCESS_TOKEN")),
         "ingestion_access_configured": bool(os.getenv("ASSISTANT_ADMIN_TOKEN")),
     }
