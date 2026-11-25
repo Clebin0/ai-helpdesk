@@ -12,7 +12,24 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: ai_helpdesk_test
+          POSTGRES_USER: helpdesk
+          POSTGRES_PASSWORD: ci_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helpdesk -d ai_helpdesk_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://helpdesk:ci_test_password@localhost:5432/ai_helpdesk_test
+      RUN_POSTGRES_TESTS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,5 +49,5 @@ jobs:
       - name: Validate Python syntax
         run: python -m compileall -q .
       - run: python train.py
-      - name: Run tests
+      - name: Run tests (SQLite unit tests + PostgreSQL/pgvector integration)
         run: python -m pytest
