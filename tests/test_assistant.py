@@ -25,6 +25,7 @@ def deterministic_embeddings(texts: list[str]) -> list[list[float]]:
 
 
 def configure_test_environment(monkeypatch, tmp_path):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("RAG_DB_PATH", str(tmp_path / "assistant.sqlite3"))
     monkeypatch.setenv("OPENAI_API_KEY", "test-key-not-real")
     monkeypatch.setenv("HF_TOKEN", "hf_test_not_real")
