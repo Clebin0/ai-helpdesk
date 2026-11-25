@@ -2,7 +2,7 @@ name: ML CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/postgres-pgvector-local-ai]
   pull_request:
     branches: [main]
 
