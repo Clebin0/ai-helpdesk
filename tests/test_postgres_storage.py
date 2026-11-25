@@ -48,6 +48,7 @@ def test_postgres_document_round_trip(monkeypatch):
     vector[0] = 1.0
     monkeypatch.setenv("DATABASE_URL", os.environ["DATABASE_URL"])
 
+    stored = False
     try:
         result = assistant_storage.store_document(
             source=source,
@@ -58,6 +59,7 @@ def test_postgres_document_round_trip(monkeypatch):
             created_at="2026-01-01T00:00:00+00:00",
         )
         assert result["chunks"] == 1
+        stored = True
 
         found = assistant_storage.retrieve_chunks(vector, model, 2)
         assert found
@@ -68,4 +70,5 @@ def test_postgres_document_round_trip(monkeypatch):
         assert any(item["source"] == source and item["chunks"] == 1 for item in documents)
         assert assistant_storage.check_database() is True
     finally:
-        assistant_storage.delete_document(source, model)
+        if stored:
+            assistant_storage.delete_document(source, model)
