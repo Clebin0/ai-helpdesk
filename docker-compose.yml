@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ai-helpdesk-postgres
+    environment:
+      POSTGRES_DB: ai_helpdesk
+      POSTGRES_USER: helpdesk
+      POSTGRES_PASSWORD: local_dev_change_me
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helpdesk -d ai_helpdesk"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-helpdesk-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: ai-helpdesk-api
+    environment:
+      DATABASE_URL: postgresql://helpdesk:local_dev_change_me@postgres:5432/ai_helpdesk
+      LLM_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://ollama:11434/v1
+      OLLAMA_CHAT_MODEL: qwen3.5:4b-q4_K_M
+      RAG_EMBEDDING_PROVIDER: local
+      LOCAL_EMBEDDING_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      RAG_MIN_RELEVANCE: "0.18"
+      ASSISTANT_ACCESS_TOKEN: ${ASSISTANT_ACCESS_TOKEN:-}
+      ASSISTANT_ADMIN_TOKEN: ${ASSISTANT_ADMIN_TOKEN:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./artifacts:/app/artifacts
+      - fastembed_cache:/root/.cache/fastembed
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  ollama_data:
+  fastembed_cache:
