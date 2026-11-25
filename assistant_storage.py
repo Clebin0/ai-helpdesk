@@ -139,26 +139,27 @@ def store_document(
             "DELETE FROM rag_chunks WHERE source = %s AND embedding_model = %s",
             (source, model),
         )
-        connection.executemany(
-            """
-            INSERT INTO rag_chunks (
-                source, chunk_index, content, embedding,
-                embedding_model, content_sha256, created_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """,
-            [
-                (
-                    source,
-                    index,
-                    chunk,
-                    Vector(vector),
-                    model,
-                    digest,
-                    created_at_value,
-                )
-                for index, (chunk, vector) in enumerate(zip(chunks, vectors))
-            ],
-        )
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                """
+                INSERT INTO rag_chunks (
+                    source, chunk_index, content, embedding,
+                    embedding_model, content_sha256, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                [
+                    (
+                        source,
+                        index,
+                        chunk,
+                        Vector(vector),
+                        model,
+                        digest,
+                        created_at_value,
+                    )
+                    for index, (chunk, vector) in enumerate(zip(chunks, vectors))
+                ],
+            )
 
     return {
         "source": source,
