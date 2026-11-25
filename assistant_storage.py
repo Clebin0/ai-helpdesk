@@ -16,9 +16,11 @@ _migrations_checked = False
 def storage_backend() -> str:
     """Choose PostgreSQL when DATABASE_URL is configured; retain SQLite for legacy tests."""
     url = os.getenv("DATABASE_URL", "").strip().lower()
+    if not url:
+        return "sqlite"
     if url.startswith(("postgresql://", "postgres://")):
         return "postgres"
-    return "sqlite"
+    raise RuntimeError("DATABASE_URL must use postgresql:// or postgres://.")
 
 
 def _database_url() -> str:
