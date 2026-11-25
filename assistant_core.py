@@ -74,6 +74,20 @@ def database_path() -> Path:
     return Path(os.getenv("RAG_DB_PATH", "data/assistant.sqlite3"))
 
 
+def storage_backend() -> str:
+    from assistant_storage import storage_backend as get_storage_backend
+
+    return get_storage_backend()
+
+
+def check_storage() -> bool:
+    if storage_backend() == "postgres":
+        from assistant_storage import check_database
+
+        return check_database()
+    return True
+
+
 def _openai_client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -231,6 +245,12 @@ def ingest_document(source: str, content: str) -> dict[str, Any]:
     model = embedding_model()
     digest = hashlib.sha256(cleaned.encode("utf-8")).hexdigest()
     now = datetime.now(timezone.utc).isoformat()
+
+    if storage_backend() == "postgres":
+        from assistant_storage import store_document
+
+        return store_document(source, chunks, vectors, model, digest, now)
+
     connection = _connect()
     try:
         with connection:
@@ -284,6 +304,11 @@ def retrieve_chunks(question: str, top_k: int = 4) -> list[dict[str, Any]]:
     if not question:
         return []
     query_vector = embed_texts([question])[0]
+    if storage_backend() == "postgres":
+        from assistant_storage import retrieve_chunks as retrieve_from_postgres
+
+        return retrieve_from_postgres(query_vector, embedding_model(), top_k)
+
     connection = _connect()
     try:
         rows = connection.execute(
@@ -314,6 +339,11 @@ def retrieve_chunks(question: str, top_k: int = 4) -> list[dict[str, Any]]:
 
 
 def list_documents() -> list[dict[str, Any]]:
+    if storage_backend() == "postgres":
+        from assistant_storage import list_documents as list_postgres_documents
+
+        return list_postgres_documents(embedding_model())
+
     connection = _connect()
     try:
         rows = connection.execute(

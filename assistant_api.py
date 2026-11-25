@@ -123,8 +123,14 @@ def assistant_chat_ui():
 
 @router.get("/health")
 def assistant_health():
+    try:
+        database_available = assistant_core.check_storage()
+    except Exception:
+        database_available = False
+
     return {
-        "status": "ready",
+        "status": "ready" if database_available else "degraded",
+        "database_available": database_available,
         "llm_provider": assistant_core.llm_provider(),
         "chat_model": assistant_core.chat_model(),
         "hf_token_configured": bool(
@@ -133,6 +139,7 @@ def assistant_health():
         "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
         "embedding_provider": assistant_core.embedding_provider(),
         "embedding_model": assistant_core.embedding_model(),
+        "storage_backend": assistant_core.storage_backend(),
         "chat_access_configured": bool(os.getenv("ASSISTANT_ACCESS_TOKEN")),
         "ingestion_access_configured": bool(os.getenv("ASSISTANT_ADMIN_TOKEN")),
     }
