@@ -123,8 +123,14 @@ def assistant_chat_ui():
 
 @router.get("/health")
 def assistant_health():
+    try:
+        database_available = assistant_core.check_storage()
+    except Exception:
+        database_available = False
+
     return {
-        "status": "ready",
+        "status": "ready" if database_available else "degraded",
+        "database_available": database_available,
         "llm_provider": assistant_core.llm_provider(),
         "chat_model": assistant_core.chat_model(),
         "hf_token_configured": bool(
