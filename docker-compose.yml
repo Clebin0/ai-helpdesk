@@ -3,15 +3,15 @@ services:
     image: pgvector/pgvector:pg16
     container_name: ai-helpdesk-postgres
     environment:
-      POSTGRES_DB: ai_helpdesk
-      POSTGRES_USER: helpdesk
-      POSTGRES_PASSWORD: local_dev_change_me
+      POSTGRES_DB: ${POSTGRES_DB:-ai_helpdesk}
+      POSTGRES_USER: ${POSTGRES_USER:-helpdesk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_dev_change_me}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U helpdesk -d ai_helpdesk"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-helpdesk} -d ${POSTGRES_DB:-ai_helpdesk}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -35,7 +35,7 @@ services:
     build: .
     container_name: ai-helpdesk-api
     environment:
-      DATABASE_URL: postgresql://helpdesk:local_dev_change_me@postgres:5432/ai_helpdesk
+      DATABASE_URL: postgresql://${POSTGRES_USER:-helpdesk}:${POSTGRES_PASSWORD:-local_dev_change_me}@postgres:5432/${POSTGRES_DB:-ai_helpdesk}
       LLM_PROVIDER: ollama
       OLLAMA_BASE_URL: http://ollama:11434/v1
       OLLAMA_CHAT_MODEL: qwen3.5:4b-q4_K_M
