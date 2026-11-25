@@ -21,6 +21,12 @@ def test_storage_backend_detects_postgres(monkeypatch):
     assert assistant_storage.storage_backend() == "postgres"
 
 
+def test_storage_backend_rejects_unknown_scheme(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "mysql://localhost/ai_helpdesk")
+    with pytest.raises(RuntimeError, match="must use postgresql"):
+        assistant_storage.storage_backend()
+
+
 def test_postgres_vector_dimension_is_validated():
     with pytest.raises(ValueError, match="requires 384"):
         assistant_storage._validate_vectors([[0.0, 1.0]])
