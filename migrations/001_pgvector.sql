@@ -1,4 +1,6 @@
 -- AI Helpdesk RAG storage. The default multilingual MiniLM embedding has 384 dimensions.
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE IF NOT EXISTS rag_chunks (
     id BIGSERIAL PRIMARY KEY,
     source TEXT NOT NULL,
