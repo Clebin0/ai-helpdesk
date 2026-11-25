@@ -102,16 +102,28 @@ Os testes cobrem categorias conhecidas, cálculo de prioridade, encaminhamento o
 
 O dataset precisa ser substituído ou complementado por chamados representativos, anonimizados e autorizados. Também faltam monitoramento de qualidade, calibração das probabilidades, análise de deriva, versionamento formal dos modelos e avaliação com analistas. Até isso existir, a saída deve ser tratada como sugestão.
 
-## LLM & RAG Assistant (módulo experimental)
+## AI Customer Support Agent
 
-O repositório também contém um copiloto de suporte separado do classificador tradicional. O padrão executa Qwen 3.5 localmente via Ollama e usa FastEmbed/ONNX para embeddings locais.
+O repositório também contém um copiloto de suporte com RAG, separado do classificador tradicional. A configuração recomendada usa **Ollama para geração local**, **FastEmbed para embeddings locais** e **PostgreSQL + pgvector para persistência e busca vetorial**.
 
-- Chat web em [/assistant/ui](http://127.0.0.1:8001/assistant/ui), com respostas em streaming e histórico limitado à sessão.
-- Ingestão autenticada de documentos autorizados.
-- Embeddings e busca semântica local em SQLite.
-- Respostas fundamentadas no contexto recuperado, com citações [S1], [S2].
-- Abstenção quando a recuperação não encontra material relevante.
+- Interface web em [/assistant/ui](http://localhost:8000/assistant/ui), com respostas em streaming e histórico limitado à sessão.
+- Ingestão autenticada de documentação autorizada.
+- Busca vetorial por similaridade cosseno no PostgreSQL/pgvector, com índice HNSW.
+- Respostas fundamentadas nos trechos recuperados e citações [S1], [S2].
+- Abstenção quando a recuperação não encontra evidência relevante.
 - Tokens separados para chat e administração; nenhum token é armazenado no código.
-- Hugging Face e OpenAI continuam como provedores opcionais, sujeitos a disponibilidade e créditos.
+- SQLite permanece como fallback de compatibilidade quando DATABASE_URL não está configurado.
 
-Consulte [docs/LLM_RAG.md](docs/LLM_RAG.md) para configuração, interface, chamadas de API, segurança e limitações.
+### Executar com Docker Compose
+
+Consulte [docs/POSTGRES_PGVECTOR.md](docs/POSTGRES_PGVECTOR.md) para configurar tokens, iniciar PostgreSQL e Ollama, baixar o modelo local e testar ingestão e consulta.
+
+~~~powershell
+Copy-Item .env.example .env
+# Preencha os tokens independentes em .env antes de iniciar os serviços.
+docker compose up -d postgres ollama
+docker compose exec ollama ollama pull qwen3.5:4b-q4_K_M
+docker compose up -d --build app
+~~~
+
+A documentação técnica do RAG, benchmark, segurança e limitações está em [docs/LLM_RAG.md](docs/LLM_RAG.md).
