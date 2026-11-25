@@ -1,6 +1,6 @@
 # AI Helpdesk — copiloto RAG local
 
-O classificador TF-IDF continua separado e inalterado. O módulo /assistant adiciona busca semântica, recuperação de documentos e geração de respostas com fontes.
+O classificador TF-IDF continua separado e inalterado. O módulo /assistant adiciona busca semântica, recuperação de documentos e geração de respostas com fontes. Para o ambiente recomendado, a persistência usa PostgreSQL + pgvector quando DATABASE_URL está configurado; SQLite continua disponível como fallback de compatibilidade. Consulte [POSTGRES_PGVECTOR.md](POSTGRES_PGVECTOR.md) para instalação, Docker Compose, migração de esquema e testes de integração. A geração padrão permanece local via Ollama e os embeddings via FastEmbed.
 
 ## Arquitetura padrão
 
